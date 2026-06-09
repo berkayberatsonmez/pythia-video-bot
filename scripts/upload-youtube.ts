@@ -60,7 +60,9 @@ async function authorize(): Promise<OAuth2Client> {
     process.exit(1);
   }
 
-  const creds = JSON.parse(readFileSync(CREDENTIALS_PATH, "utf-8"));
+  // BOM (U+FEFF) varsa temizle — CI'da secret'tan gelen dosyalarda olabiliyor
+  const stripBom = (s: string) => s.replace(/^﻿/, "").trim();
+  const creds = JSON.parse(stripBom(readFileSync(CREDENTIALS_PATH, "utf-8")));
   const { client_secret, client_id, redirect_uris } =
     creds.installed || creds.web;
 
@@ -71,7 +73,7 @@ async function authorize(): Promise<OAuth2Client> {
   );
 
   if (existsSync(TOKEN_PATH)) {
-    const token = JSON.parse(readFileSync(TOKEN_PATH, "utf-8"));
+    const token = JSON.parse(stripBom(readFileSync(TOKEN_PATH, "utf-8")));
     oAuth2Client.setCredentials(token);
     return oAuth2Client;
   }
