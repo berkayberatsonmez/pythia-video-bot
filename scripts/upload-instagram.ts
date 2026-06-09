@@ -55,22 +55,25 @@ export function buildReelCaption(category: string, id: string): string {
   return caption.length > 2150 ? caption.slice(0, 2150) : caption;
 }
 
+// ─── gh CLI çağrısı (shell-safe) ─────────────────────────────────────────
+// NOT: shell:true + DİZİ argüman = tırnaklama bozulur (parantez/boşluk shell'de
+// patlar). O yüzden komutu TEK STRING olarak, özel karakterli argümanları
+// elle tırnaklayarak veriyoruz. Hem Linux (CI) hem Windows'ta çalışır.
+function gh(cmd: string, silent = false): number {
+  const r = spawnSync(`gh ${cmd}`, {
+    shell: true,
+    stdio: silent ? "ignore" : "inherit",
+  });
+  return r.status ?? 1;
+}
+
 // ─── Videoyu GitHub Release'e yükle → public URL döndür ───────────────────
 export function uploadToRelease(videoPath: string, tag: string): string {
-  // Release yoksa oluştur (zaten varsa hata yutulur)
-  spawnSync(
-    "gh",
-    ["release", "create", tag, "--repo", REPO, "--title", `Reels (${tag})`,
-     "--notes", "Pythia Reels — IG için geçici public hosting (otomatik)"],
-    { shell: true, stdio: "ignore" },
-  );
+  // Release yoksa oluştur (zaten varsa "already exists" hatası yutulur)
+  gh(`release create ${tag} --repo ${REPO} --title "Pythia Reels" --notes "Auto IG hosting"`, true);
   // Asset'i yükle (varsa üzerine yaz)
-  const up = spawnSync(
-    "gh",
-    ["release", "upload", tag, videoPath, "--clobber", "--repo", REPO],
-    { shell: true, stdio: "inherit" },
-  );
-  if (up.status !== 0) {
+  const status = gh(`release upload ${tag} "${videoPath}" --clobber --repo ${REPO}`);
+  if (status !== 0) {
     throw new Error(`gh release upload başarısız: ${videoPath}`);
   }
   const file = basename(videoPath);
@@ -79,11 +82,7 @@ export function uploadToRelease(videoPath: string, tag: string): string {
 
 // ─── Yayınlanan asset'i sil (IG zaten çekti — storage şişmesin) ───────────
 function deleteReleaseAsset(tag: string, videoPath: string): void {
-  spawnSync(
-    "gh",
-    ["release", "delete-asset", tag, basename(videoPath), "--yes", "--repo", REPO],
-    { shell: true, stdio: "ignore" },
-  );
+  gh(`release delete-asset ${tag} "${basename(videoPath)}" --yes --repo ${REPO}`, true);
 }
 
 // ─── Reels yayınla (3 adım) ──────────────────────────────────────────────
