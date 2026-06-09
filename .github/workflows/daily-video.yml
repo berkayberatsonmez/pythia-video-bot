@@ -70,9 +70,10 @@ jobs:
           if [ -n "$MODE" ]; then
             echo "▶ Manuel: $MODE"
             case "$MODE" in
-              instagram) npm run rotation -- --instagram ;;
-              youtube)   npm run rotation -- --upload ;;
-              *)         npm run rotation -- --upload --instagram ;;
+              instagram)   npm run rotation -- --instagram ;;
+              youtube)     npm run rotation -- --upload ;;
+              commenttest) npx tsx scripts/upload-instagram.ts --comment-test ;;
+              *)           npm run rotation -- --upload --instagram ;;
             esac
           else
             echo "▶ Zamanlı: $SCHED"
