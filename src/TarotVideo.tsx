@@ -14,6 +14,7 @@ import {
   GOLD,
   BG_GRADIENT,
   StarField,
+  BackgroundMusic,
   MeaningCard,
   Question,
   LogoCta,
@@ -191,6 +192,7 @@ export const TarotVideo: React.FC<TarotVideoProps> = ({ card }) => {
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
+      <BackgroundMusic />
 
       {/* [0-2.5s] Hook */}
       <Sequence durationInFrames={2.5 * fps} layout="none">

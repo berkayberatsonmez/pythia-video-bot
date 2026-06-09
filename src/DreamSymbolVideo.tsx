@@ -11,6 +11,7 @@ import {
 } from "remotion";
 import type { DreamSymbol } from "./data/dream-symbols";
 import { SymbolIcon } from "./components/SymbolIcon";
+import { BackgroundMusic } from "./components/shared";
 
 const GOLD = "#D4A843";
 
@@ -440,6 +441,7 @@ export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
       }}
     >
       <StarField />
+      <BackgroundMusic />
 
       {/* [0-2.5s] Hook */}
       <Sequence durationInFrames={2.5 * fps} layout="none">

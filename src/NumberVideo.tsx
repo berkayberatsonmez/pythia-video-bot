@@ -12,6 +12,7 @@ import {
   GOLD,
   BG_GRADIENT,
   StarField,
+  BackgroundMusic,
   MeaningCard,
   Question,
   LogoCta,
@@ -159,6 +160,7 @@ export const NumberVideo: React.FC<NumberVideoProps> = ({ content }) => {
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
+      <BackgroundMusic />
 
       {/* [0-2.5s] Hook */}
       <Sequence durationInFrames={2.5 * fps} layout="none">

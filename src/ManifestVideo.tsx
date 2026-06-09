@@ -8,7 +8,13 @@ import {
   useVideoConfig,
 } from "remotion";
 import type { Manifesto } from "./data/manifestation";
-import { GOLD, BG_GRADIENT, StarField, LogoCta } from "./components/shared";
+import {
+  GOLD,
+  BG_GRADIENT,
+  StarField,
+  BackgroundMusic,
+  LogoCta,
+} from "./components/shared";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Manifesto video — app özelliğiyle birebir: OKUNACAK manifesto.
@@ -226,6 +232,7 @@ export const ManifestVideo: React.FC<ManifestVideoProps> = ({ content }) => {
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
+      <BackgroundMusic />
 
       {/* [0-2.5s] Hook */}
       <Sequence durationInFrames={2.5 * fps} layout="none">

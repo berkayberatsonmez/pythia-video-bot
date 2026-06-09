@@ -1,6 +1,7 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   interpolate,
   spring,
@@ -13,6 +14,34 @@ export const GOLD = "#D4A843";
 export const PURPLE = "#a855f7";
 export const BG_GRADIENT =
   "linear-gradient(180deg, #09071A 0%, #1a0a2e 50%, #2a1845 100%)";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BackgroundMusic — telifsiz mistik müzik (tüm videolarda ortak)
+// Başta fade-in, sonda fade-out. public/music.mp3
+// ═══════════════════════════════════════════════════════════════════════════
+export const BackgroundMusic: React.FC<{ maxVolume?: number }> = ({
+  maxVolume = 0.45,
+}) => {
+  const { durationInFrames, fps } = useVideoConfig();
+  return (
+    <Audio
+      src={staticFile("music.mp3")}
+      volume={(f) =>
+        interpolate(
+          f,
+          [
+            0,
+            Math.round(0.6 * fps),
+            durationInFrames - Math.round(1.2 * fps),
+            durationInFrames,
+          ],
+          [0, maxVolume, maxVolume, 0],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+        )
+      }
+    />
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // StarField — kozmik yıldız arka planı (tüm kategorilerde ortak)
