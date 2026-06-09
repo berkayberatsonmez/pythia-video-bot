@@ -58,7 +58,7 @@ function dreamMeta(id: string): VideoMeta | null {
   if (!s) return null;
   const upper = s.symbolNameUpper.replace(/\n/g, " ");
   const title = clampTitle(
-    `Rüyanda ${upper} Gördüysen 🌙 Bilinçaltın Bu 3 Şeyi Söylüyor #Shorts`,
+    `Rüyanda ${upper} Gördüysen 🌙 Bilinçaltın Bu 3 Şeyi Söylüyor #shorts`,
   );
   const desc = [
     `Rüyanda ${s.symbolName} gördüysen bilinçaltın bunu söylüyor 🌙`,
@@ -69,7 +69,7 @@ function dreamMeta(id: string): VideoMeta | null {
     "",
     "Seninki nasıldı? 👇 Yorumlara yaz, beraber yorumlayalım 🌙",
     ...PYTHIA_CTA,
-    `#rüyatabiri #rüya ${s.hashtag} #rüyayorumu #bilinçaltı #mistik #dream #Shorts`,
+    `#rüyatabiri #rüya ${s.hashtag} #rüyayorumu #bilinçaltı #mistik #dream #shorts`,
     "",
     DISCLAIMER,
   ].join("\n");
@@ -88,7 +88,7 @@ function dreamMeta(id: string): VideoMeta | null {
       "dream meaning",
       "dream interpretation",
       "Pythia",
-      "Shorts",
+      "shorts",
     ]),
   };
 }
@@ -98,7 +98,7 @@ function tarotMeta(id: string): VideoMeta | null {
   const c = getTarotById(id);
   if (!c) return null;
   const title = clampTitle(
-    `Bugün Senin Kartın: ${c.cardName} 🔮 Evren Sana Bunu Söylüyor #Shorts`,
+    `Bugün Senin Kartın: ${c.cardName} 🔮 Evren Sana Bunu Söylüyor #shorts`,
   );
   const desc = [
     `Bugün senin tarot kartın: ${c.cardName} (${c.cardNameSub}) 🔮`,
@@ -110,7 +110,7 @@ function tarotMeta(id: string): VideoMeta | null {
     "",
     "Sen bugün hangi kartı çekiyorsun? 👇 Yorumlara yaz 🔮",
     ...PYTHIA_CTA,
-    `#tarot #tarotfalı #günlüktarot #fal #mistik #tarotreading #Shorts`,
+    `#tarot #tarotfalı #günlüktarot #fal #mistik #tarotreading #shorts`,
     "",
     DISCLAIMER,
   ].join("\n");
@@ -129,7 +129,7 @@ function tarotMeta(id: string): VideoMeta | null {
       "tarot cards",
       "daily tarot",
       "Pythia",
-      "Shorts",
+      "shorts",
     ]),
   };
 }
@@ -141,7 +141,7 @@ function numberMeta(id: string): VideoMeta | null {
 
   if (n.kind === "lifepath") {
     const title = clampTitle(
-      `Yaşam Yolu ${n.number} İsen 🔢 ${n.title} Olduğunu Biliyor muydun? #Shorts`,
+      `Yaşam Yolu ${n.number} İsen 🔢 ${n.title} Olduğunu Biliyor muydun? #shorts`,
     );
     const desc = [
       `Yaşam yolu sayın ${n.number} ise, sen bir ${n.title.toLowerCase()}sın 🔢`,
@@ -152,7 +152,7 @@ function numberMeta(id: string): VideoMeta | null {
       "",
       "Senin yaşam yolu sayın kaç? 👇 Yorumlara yaz 🔢",
       ...PYTHIA_CTA,
-      `#numeroloji #yaşamyolu #numeroloji${n.number} #mistik #numerology #Shorts`,
+      `#numeroloji #yaşamyolu #numeroloji${n.number} #mistik #numerology #shorts`,
       "",
       DISCLAIMER,
     ].join("\n");
@@ -170,14 +170,14 @@ function numberMeta(id: string): VideoMeta | null {
         "life path number",
         `life path ${n.number}`,
         "Pythia",
-        "Shorts",
+        "shorts",
       ]),
     };
   }
 
   // angel
   const title = clampTitle(
-    `Sürekli ${n.number} Görüyorsan 👁️ Melekler Sana Bunu Söylüyor #Shorts`,
+    `Sürekli ${n.number} Görüyorsan 👁️ Melekler Sana Bunu Söylüyor #shorts`,
   );
   const desc = [
     `Sürekli ${n.number} görüyorsan bu tesadüf değil — ${n.title} ✨`,
@@ -188,7 +188,7 @@ function numberMeta(id: string): VideoMeta | null {
     "",
     "Sen hangi sayıyı sürekli görüyorsun? 👇 Yorumlara yaz ✨",
     ...PYTHIA_CTA,
-    `#melekSayıları #melekSayısı${n.number} #manifest #mistik #angelnumbers #Shorts`,
+    `#melekSayıları #melekSayısı${n.number} #manifest #mistik #angelnumbers #shorts`,
     "",
     DISCLAIMER,
   ].join("\n");
@@ -206,7 +206,7 @@ function numberMeta(id: string): VideoMeta | null {
       `${n.number} angel number`,
       "manifestation",
       "Pythia",
-      "Shorts",
+      "shorts",
     ]),
   };
 }
@@ -217,7 +217,7 @@ function zodiacMeta(id: string): VideoMeta | null {
   if (!z) return null;
   const subLower = z.signNameSub.toLowerCase();
   const title = clampTitle(
-    `${z.signName} Burcuysan 🔮 Kimsenin Bilmediği 3 Gizli Özelliğin #Shorts`,
+    `${z.signName} Burcuysan 🔮 Kimsenin Bilmediği 3 Gizli Özelliğin #shorts`,
   );
   const desc = [
     `${z.signName} (${z.signNameSub}) burcunun kimsenin bilmediği gizli yüzü 🔮`,
@@ -229,7 +229,7 @@ function zodiacMeta(id: string): VideoMeta | null {
     "",
     `${z.signName} olan var mı? 👇 Yorumlara yaz, etiketle 🔮`,
     ...PYTHIA_CTA,
-    `#burç ${z.hashtag} #astroloji #burçyorumu #${subLower} #zodiac #astrology #Shorts`,
+    `#burç ${z.hashtag} #astroloji #burçyorumu #${subLower} #zodiac #astrology #shorts`,
     "",
     DISCLAIMER,
   ].join("\n");
@@ -258,7 +258,7 @@ function manifestMeta(id: string): VideoMeta | null {
   const m = getManifestById(id);
   if (!m) return null;
   const title = clampTitle(
-    `${m.theme} İçin Günlük Manifesto 🌙 Yüksek Sesle Oku #Shorts`,
+    `${m.theme} İçin Günlük Manifesto 🌙 Yüksek Sesle Oku #shorts`,
   );
   const desc = [
     `${m.prompt.toLowerCase()} — ${m.theme} manifestosu 🌙`,
@@ -270,7 +270,7 @@ function manifestMeta(id: string): VideoMeta | null {
     "",
     "Sen neyi manifest ediyorsun? 👇 Yorumlara yaz 🌙",
     ...PYTHIA_CTA,
-    `#manifesto #olumlama #manifest #çekimyasası #affirmations #Shorts`,
+    `#manifesto #olumlama #manifest #çekimyasası #affirmations #shorts`,
     "",
     DISCLAIMER,
   ].join("\n");
@@ -289,7 +289,7 @@ function manifestMeta(id: string): VideoMeta | null {
       "affirmations",
       "manifestation",
       "Pythia",
-      "Shorts",
+      "shorts",
     ]),
   };
 }
