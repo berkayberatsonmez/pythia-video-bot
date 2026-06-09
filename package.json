@@ -33,8 +33,10 @@
     "rotation:preview": "tsx scripts/rotation.ts --preview",
     "rotation": "tsx scripts/render-rotation.ts",
     "rotation:test": "tsx scripts/render-rotation.ts --upload --now --privacy unlisted",
-    "daily": "tsx scripts/render-rotation.ts --upload",
-    "upload:youtube": "tsx scripts/upload-youtube.ts"
+    "daily": "tsx scripts/render-rotation.ts --upload --instagram",
+    "instagram:test": "tsx scripts/render-rotation.ts --instagram",
+    "upload:youtube": "tsx scripts/upload-youtube.ts",
+    "upload:instagram": "tsx scripts/upload-instagram.ts"
   },
   "sideEffects": [
     "*.css"

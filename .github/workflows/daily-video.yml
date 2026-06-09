@@ -6,6 +6,18 @@ on:
   schedule:
     - cron: "0 5 * * *"
   workflow_dispatch: # Actions sekmesinden manuel tetikleme
+    inputs:
+      mode:
+        description: "Ne yayınlansın?"
+        type: choice
+        options:
+          - both
+          - instagram
+          - youtube
+        default: both
+
+permissions:
+  contents: write # gh release (IG video hosting) için gerekli
 
 jobs:
   daily:
@@ -44,5 +56,18 @@ jobs:
           echo "${{ secrets.GOOGLE_TOKEN_B64 }}" | base64 -d > scripts/token.json
           node -e "JSON.parse(require('fs').readFileSync('scripts/credentials.json','utf8')); JSON.parse(require('fs').readFileSync('scripts/token.json','utf8')); console.log('✓ JSON geçerli')"
 
-      - name: Render + zamanlı YouTube yükleme
-        run: npm run daily
+      - name: Render + yükle (YouTube zamanlı + Instagram Reels)
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MODE="${{ github.event.inputs.mode || 'both' }}"
+          echo "▶ Mode: $MODE"
+          if [ "$MODE" = "instagram" ]; then
+            npm run rotation -- --instagram
+          elif [ "$MODE" = "youtube" ]; then
+            npm run rotation -- --upload
+          else
+            npm run rotation -- --upload --instagram
+          fi

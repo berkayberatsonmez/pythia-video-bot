@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { getTodaysVideos, type SelectedVideo } from "./rotation";
 import { authorize, uploadVideoFile } from "./upload-youtube";
+import { postReelFromFile } from "./upload-instagram";
 
 const OUTPUT_DIR = join(process.cwd(), "out", "daily");
 
@@ -21,6 +22,7 @@ const OUTPUT_DIR = join(process.cwd(), "out", "daily");
 //   --now           zamanlı değil, hemen yayınla (test için)
 //   --privacy <p>   --now ile birlikte gizlilik (public/unlisted/private)
 const DO_UPLOAD = process.argv.includes("--upload");
+const DO_INSTAGRAM = process.argv.includes("--instagram");
 const UPLOAD_NOW = process.argv.includes("--now");
 const PRIVACY = process.argv.includes("--privacy")
   ? process.argv[process.argv.indexOf("--privacy") + 1]
@@ -134,6 +136,21 @@ async function main() {
     console.log(`   npm run rotation:test    (test → unlisted, hemen)`);
     console.log(`   npm run daily            (üretim → zamanlı yayın)`);
   }
+
+  // 3) Instagram Reels (opsiyonel) — YouTube'dan bağımsız, anında yayın
+  if (DO_INSTAGRAM) {
+    console.log(`\n📸 Instagram Reels'e yükleniyor (anında yayın)...`);
+    for (const { v, path } of rendered) {
+      try {
+        const mediaId = await postReelFromFile(path, v.category, v.id, "reels");
+        console.log(`   ✅ ${v.label} → Reels yayında (media ${mediaId})`);
+      } catch (e) {
+        console.error(`   ❌ IG yayın başarısız (${v.label} ${v.id}):`, e);
+      }
+    }
+    console.log(`\n🎉 Instagram Reels tamamlandı!`);
+  }
+
   console.log();
 }
 
