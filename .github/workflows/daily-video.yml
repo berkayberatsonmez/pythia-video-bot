@@ -37,15 +37,12 @@ jobs:
       - name: Remotion tarayıcısını hazırla
         run: npx remotion browser ensure
 
-      - name: Google kimlik bilgilerini yaz (secrets'tan)
+      - name: Google kimlik bilgilerini yaz (base64 secrets'tan)
         run: |
           mkdir -p scripts
-          cat > scripts/credentials.json <<'EOF'
-          ${{ secrets.GOOGLE_CREDENTIALS }}
-          EOF
-          cat > scripts/token.json <<'EOF'
-          ${{ secrets.GOOGLE_TOKEN }}
-          EOF
+          echo "${{ secrets.GOOGLE_CREDENTIALS_B64 }}" | base64 -d > scripts/credentials.json
+          echo "${{ secrets.GOOGLE_TOKEN_B64 }}" | base64 -d > scripts/token.json
+          node -e "JSON.parse(require('fs').readFileSync('scripts/credentials.json','utf8')); JSON.parse(require('fs').readFileSync('scripts/token.json','utf8')); console.log('✓ JSON geçerli')"
 
       - name: Render + zamanlı YouTube yükleme
         run: npm run daily
