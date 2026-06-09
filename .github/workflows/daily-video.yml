@@ -16,6 +16,7 @@ on:
           - both
           - instagram
           - youtube
+          - commenttest
         default: both
 
 permissions:

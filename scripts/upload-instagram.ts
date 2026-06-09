@@ -12,7 +12,7 @@
 
 import { spawnSync } from "node:child_process";
 import { basename } from "node:path";
-import { buildInstagramCaption } from "./metadata";
+import { buildInstagramCaption, buildFirstComment } from "./metadata";
 
 // graph.instagram.com sürümsüz çalışıyor (Instagram Login API) — deprecation derdi yok
 const IG_BASE = "https://graph.instagram.com";
@@ -113,6 +113,19 @@ function deleteReleaseAsset(tag: string, videoPath: string): void {
   gh(`release delete-asset ${tag} "${basename(videoPath)}" --yes --repo ${REPO}`, true);
 }
 
+// ─── Yoruma bırak / sil (otomatik ilk yorum + izin testi için) ────────────
+export async function postComment(mediaId: string, message: string): Promise<string> {
+  const r = await igPost(`${mediaId}/comments`, { message });
+  return r.id;
+}
+
+async function deleteComment(commentId: string): Promise<void> {
+  await fetch(
+    `${IG_BASE}/${commentId}?access_token=${encodeURIComponent(token())}`,
+    { method: "DELETE" },
+  ).catch(() => undefined);
+}
+
 // ─── Reels yayınla (3 adım) ──────────────────────────────────────────────
 export async function publishReel(
   videoUrl: string,
@@ -174,22 +187,48 @@ export async function postReelFromFile(
   const mediaId = await publishReel(url, caption, COVER_OFFSET_MS[category]);
   // Sadece başarıda temizle (hata olursa asset debug için kalsın)
   deleteReleaseAsset(tag, videoPath);
+
+  // İlk yorumu otomatik bırak (etkileşim) — hata olsa da yayını bozma
+  try {
+    const cid = await postComment(mediaId, buildFirstComment(category, id));
+    console.log(`   💬 İlk yorum bırakıldı (${cid})`);
+  } catch (e) {
+    console.error(`   ⚠️ İlk yorum atılamadı:`, e instanceof Error ? e.message : e);
+  }
+
   return mediaId;
 }
 
 // ─── CLI: tek video testi ────────────────────────────────────────────────
 if (process.argv[1]?.includes("upload-instagram")) {
-  const [, , category, id, videoPath] = process.argv;
-  if (!category || !id || !videoPath) {
-    console.error(
-      "Kullanım: tsx scripts/upload-instagram.ts <category> <id> <videoPath>",
-    );
-    process.exit(1);
-  }
-  postReelFromFile(videoPath, category, id, "reels-test")
-    .then((mediaId) => console.log(`\n🎉 Reels yayınlandı! Media ID: ${mediaId}`))
-    .catch((e) => {
-      console.error("\n💥 IG yayın hatası:", e);
+  if (process.argv.includes("--comment-test")) {
+    // Yorum izni testi: en son medyaya yorum at + hemen sil (iz bırakmaz)
+    (async () => {
+      const media = await igGet("me/media", { fields: "id", limit: "1" });
+      const mediaId = media.data?.[0]?.id;
+      if (!mediaId) throw new Error("Test edilecek mevcut medya yok");
+      console.log(`🔎 Test medyası: ${mediaId}`);
+      const cid = await postComment(mediaId, "✨");
+      console.log(`✅ YORUM İZNİ ÇALIŞIYOR (yorum ${cid})`);
+      await deleteComment(cid);
+      console.log("🧹 Test yorumu silindi — iz bırakılmadı");
+    })().catch((e) => {
+      console.error("❌ Yorum izni HATASI:", e);
       process.exit(1);
     });
+  } else {
+    const [, , category, id, videoPath] = process.argv;
+    if (!category || !id || !videoPath) {
+      console.error(
+        "Kullanım: tsx scripts/upload-instagram.ts <category> <id> <videoPath>",
+      );
+      process.exit(1);
+    }
+    postReelFromFile(videoPath, category, id, "reels-test")
+      .then((mediaId) => console.log(`\n🎉 Reels yayınlandı! Media ID: ${mediaId}`))
+      .catch((e) => {
+        console.error("\n💥 IG yayın hatası:", e);
+        process.exit(1);
+      });
+  }
 }

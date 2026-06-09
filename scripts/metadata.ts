@@ -449,3 +449,26 @@ export function buildInstagramCaption(category: string, id: string): string {
   }
   throw new Error(`IG caption üretilemedi: ${category}/${id}`);
 }
+
+// ─── İlk yorum — paylaşımdan hemen sonra otomatik bırakılır (etkileşim) ────
+// Cevabı kolay soru → çok yorum gelir. Sabitlemeyi (pin) kullanıcı elle yapar.
+export function buildFirstComment(category: string, id: string): string {
+  switch (category) {
+    case "dream":
+      return "Sen bu rüyayı gördün mü? 👀 Detayını yaz — beraber çözelim 🌙";
+    case "tarot":
+      return 'İçinden bir niyet tut, "çektim" yaz ✨ Kartın bugün sana ne diyor? 👇';
+    case "zodiac": {
+      const z = getZodiacById(id);
+      return `${z ? z.signName + " olan var mı?" : "Sen hangi burçsun?"} 👇 Ne kadar uydu: 🔥 tam ben / 😅 hiç`;
+    }
+    case "number": {
+      const n = getNumberById(id);
+      if (n?.kind === "angel") return "Sen sürekli hangi sayıyı görüyorsun? 👀👇";
+      return "Senin yaşam yolu sayın kaç? 🔢 Doğum tarihini yaz, hesaplayayım 👇";
+    }
+    case "manifest":
+      return "Şu an neyi manifest ediyorsun? Yorumlara yaz — evren duysun 🌙✨";
+  }
+  return "Yorumun ne? 👇 Her yoruma bakıyorum 🤍";
+}
