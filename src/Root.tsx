@@ -1,14 +1,155 @@
 import "./index.css";
+import React from "react";
 import { Composition } from "remotion";
-import { MyComposition } from "./Composition";
+import { HelloWorld } from "./Composition";
+import { TarotReveal } from "./TarotReveal";
+import { DreamReveal } from "./DreamReveal";
+import { SnakeDream } from "./SnakeDream";
+import { TeethDream } from "./TeethDream";
+import { DreamSymbolVideo } from "./DreamSymbolVideo";
+import { DREAM_SYMBOLS, getSymbolById } from "./data/dream-symbols";
+import { TarotVideo } from "./TarotVideo";
+import { TAROT_CARDS, getTarotById } from "./data/tarot-cards";
+import { NumberVideo } from "./NumberVideo";
+import { NUMBERS, getNumberById } from "./data/numbers";
+import { ZodiacVideo } from "./ZodiacVideo";
+import { ZODIAC_SIGNS, getZodiacById } from "./data/zodiac-signs";
+import { ManifestVideo } from "./ManifestVideo";
+import { MANIFESTATIONS, getManifestById } from "./data/manifestation";
+
+// ─── Wrapper — symbolId → full symbol lookup ────────────────────────────
+const DreamSymbolWrapper: React.FC<{ symbolId: string }> = ({ symbolId }) => {
+  const symbol = getSymbolById(symbolId) ?? DREAM_SYMBOLS[0];
+  return <DreamSymbolVideo symbol={symbol} />;
+};
+
+// ─── Wrapper — tarot cardId → full card lookup ──────────────────────────
+const TarotWrapper: React.FC<{ cardId: string }> = ({ cardId }) => {
+  const card = getTarotById(cardId) ?? TAROT_CARDS[0];
+  return <TarotVideo card={card} />;
+};
+
+// ─── Wrapper — number id → full content lookup ──────────────────────────
+const NumberWrapper: React.FC<{ numberId: string }> = ({ numberId }) => {
+  const content = getNumberById(numberId) ?? NUMBERS[0];
+  return <NumberVideo content={content} />;
+};
+
+// ─── Wrapper — zodiac id → full sign lookup ─────────────────────────────
+const ZodiacWrapper: React.FC<{ signId: string }> = ({ signId }) => {
+  const sign = getZodiacById(signId) ?? ZODIAC_SIGNS[0];
+  return <ZodiacVideo sign={sign} />;
+};
+
+// ─── Wrapper — manifest id → full content lookup ────────────────────────
+const ManifestWrapper: React.FC<{ manifestId: string }> = ({ manifestId }) => {
+  const content = getManifestById(manifestId) ?? MANIFESTATIONS[0];
+  return <ManifestVideo content={content} />;
+};
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* ═══ RÜYA — 10 sembol ═══════════════════════════════════════ */}
+      {/* Render: npx remotion render src/index.ts DreamSymbolVideo \
+                  out/v.mp4 --props='{"symbolId":"snake"}'                */}
       <Composition
-        id="MyComp"
-        component={MyComposition}
-        durationInFrames={60}
+        id="DreamSymbolVideo"
+        component={DreamSymbolWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ symbolId: "snake" }}
+      />
+
+      {/* ═══ TAROT — 22 Major Arcana ════════════════════════════════ */}
+      {/* Render: npx remotion render src/index.ts TarotVideo \
+                  out/v.mp4 --props='{"cardId":"star"}'                   */}
+      <Composition
+        id="TarotVideo"
+        component={TarotWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ cardId: "star" }}
+      />
+
+      {/* ═══ NUMEROLOJİ + MELEK SAYILARI — 21 sayı ══════════════════ */}
+      {/* Render: npx remotion render src/index.ts NumberVideo \
+                  out/v.mp4 --props='{"numberId":"a111"}'                 */}
+      <Composition
+        id="NumberVideo"
+        component={NumberWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ numberId: "a111" }}
+      />
+
+      {/* ═══ BURÇ — 12 burç (gizli yüz) ═════════════════════════════ */}
+      {/* Render: npm run video -- zodiac scorpio                       */}
+      <Composition
+        id="ZodiacVideo"
+        component={ZodiacWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ signId: "scorpio" }}
+      />
+
+      {/* ═══ MANİFEST — 12 teknik + ay fazları ══════════════════════ */}
+      {/* Render: npm run video -- manifest m369                         */}
+      <Composition
+        id="ManifestVideo"
+        component={ManifestWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ manifestId: "confidence" }}
+      />
+
+      {/* ═══ Eski (specific) compositions — referans için ═══════════ */}
+      <Composition
+        id="TeethDream"
+        component={TeethDream}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="SnakeDream"
+        component={SnakeDream}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="DreamReveal"
+        component={DreamReveal}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="TarotReveal"
+        component={TarotReveal}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="HelloWorld"
+        component={HelloWorld}
+        durationInFrames={90}
         fps={30}
         width={1280}
         height={720}

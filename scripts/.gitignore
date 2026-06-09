@@ -1,0 +1,7 @@
+# OAuth credentials — ASLA commit etme!
+credentials.json
+token.json
+*.json.backup
+
+# Rotasyon state (cursor takibi)
+rotation-state.json

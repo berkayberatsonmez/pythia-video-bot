@@ -1,0 +1,51 @@
+name: Pythia Günlük Video
+
+# Her gün 05:00 UTC (08:00 TR) — render eder, 13:00 ve 20:00 TR'ye zamanlı yükler.
+# YouTube zamanlı yayını sayesinde videolar doğru saatte otomatik public olur.
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch: # Actions sekmesinden manuel tetikleme
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Chrome bağımlılıkları (Remotion render için)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 fonts-liberation \
+            fonts-noto-color-emoji
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Remotion tarayıcısını hazırla
+        run: npx remotion browser ensure
+
+      - name: Google kimlik bilgilerini yaz (secrets'tan)
+        run: |
+          mkdir -p scripts
+          cat > scripts/credentials.json <<'EOF'
+          ${{ secrets.GOOGLE_CREDENTIALS }}
+          EOF
+          cat > scripts/token.json <<'EOF'
+          ${{ secrets.GOOGLE_TOKEN }}
+          EOF
+
+      - name: Render + zamanlı YouTube yükleme
+        run: npm run daily
