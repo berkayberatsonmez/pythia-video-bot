@@ -12,7 +12,7 @@
 
 import { spawnSync } from "node:child_process";
 import { basename } from "node:path";
-import { buildMetadata } from "./metadata";
+import { buildInstagramCaption } from "./metadata";
 
 // graph.instagram.com sürümsüz çalışıyor (Instagram Login API) — deprecation derdi yok
 const IG_BASE = "https://graph.instagram.com";
@@ -47,12 +47,9 @@ async function igGet(path: string, params: Record<string, string>): Promise<any>
   return json;
 }
 
-// ─── IG caption: YouTube metadata'sından üret (Reels'e uyarla) ────────────
+// ─── IG caption: Instagram'a ÖZEL üretici (metadata.ts) ───────────────────
 export function buildReelCaption(category: string, id: string): string {
-  const meta = buildMetadata(category, id);
-  // YouTube'a özel #shorts → IG keşfet etiketleri
-  const caption = meta.description.replace(/#shorts/gi, "#reels #keşfet #keşfetteyiz");
-  return caption.length > 2150 ? caption.slice(0, 2150) : caption;
+  return buildInstagramCaption(category, id);
 }
 
 // ─── gh CLI çağrısı (shell-safe) ─────────────────────────────────────────

@@ -319,3 +319,133 @@ export function buildMetadata(category: string, id: string): VideoMeta {
   }
   return meta;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSTAGRAM caption — IG'ye ÖZEL (YouTube'dan farklı, 2026 best practice)
+//   • İlk satır = güçlü kanca (IG 125 karakterde "...more" ile keser)
+//   • 3 anlam → sessiz izlenebilir (completion rate ↑)
+//   • CTA: 🔖 Kaydet + 📤 Gönder (2026 #1 sinyal: DM share) + 💬 Yorum
+//   • 5 hashtag (2026: 5'ten fazlası reach DÜŞÜRÜR) → 4 niche + #keşfet
+// ═══════════════════════════════════════════════════════════════════════════
+
+const IG_BRAND = [
+  "🔮 Pythia — AI ile rüya tabiri, tarot, burç, numeroloji",
+  "🎁 Profilde 3 gün ücretsiz · 👇 Link bio'da",
+];
+
+function meaningsBlock(meanings: { title: string; desc: string }[]): string[] {
+  return meanings.map(
+    (m, i) => `${i + 1}️⃣ ${m.title}\n${m.desc.replace(/\n/g, " ")}`,
+  );
+}
+
+function igAssemble(p: {
+  hook: string;
+  body: string[];
+  reflection?: string;
+  save: string;
+  share: string;
+  comment: string;
+  hashtags: string[];
+}): string {
+  const lines = [
+    p.hook,
+    "",
+    ...p.body,
+    "",
+    ...(p.reflection ? [p.reflection, ""] : []),
+    `🔖 ${p.save}`,
+    `📤 ${p.share}`,
+    `💬 ${p.comment}`,
+    "",
+    ...IG_BRAND,
+    "",
+    p.hashtags.slice(0, 5).join(" "),
+    "",
+    "* Yalnızca eğlence amaçlıdır.",
+  ];
+  const caption = lines.join("\n");
+  return caption.length > 2150 ? caption.slice(0, 2150) : caption;
+}
+
+export function buildInstagramCaption(category: string, id: string): string {
+  switch (category) {
+    case "dream": {
+      const s = getSymbolById(id);
+      if (!s) break;
+      return igAssemble({
+        hook: `Rüyanda ${s.symbolName} gördüysen 🌙 bilinçaltın bunu söylüyor`,
+        body: meaningsBlock(s.meanings),
+        reflection: `${s.questionBody.replace(/\n/g, " ")} — ${s.questionFooter}`,
+        save: "Kaydet — sabah hatırla",
+        share: "Aynı rüyayı gören birine gönder",
+        comment: "Seninki nasıldı? Yorumlara yaz",
+        hashtags: ["#rüyatabiri", "#rüyayorumu", s.hashtag, "#bilinçaltı", "#keşfet"],
+      });
+    }
+    case "tarot": {
+      const c = getTarotById(id);
+      if (!c) break;
+      return igAssemble({
+        hook: `Bugün senin kartın: ${c.cardName} 🔮 ${c.energy}`,
+        body: meaningsBlock(c.meanings),
+        reflection: `${c.questionBody.replace(/\n/g, " ")} — ${c.questionFooter}`,
+        save: "Kaydet — günün kartı",
+        share: "Bugün kart çekmesi gereken birine gönder",
+        comment: "Sen hangi kartı çekiyorsun?",
+        hashtags: ["#tarot", "#tarotfalı", "#günlüktarot", "#fal", "#keşfet"],
+      });
+    }
+    case "zodiac": {
+      const z = getZodiacById(id);
+      if (!z) break;
+      return igAssemble({
+        hook: `${z.signName} burcuysan 🔮 kimsenin bilmediği 3 gizli yönün`,
+        body: meaningsBlock(z.meanings),
+        reflection: `${z.questionBody.replace(/\n/g, " ")} — ${z.questionFooter}`,
+        save: "Kaydet — sonra oku",
+        share: `Bir ${z.signName} burcuna gönder`,
+        comment: `${z.signName} olan var mı? Yorumlara yaz`,
+        hashtags: ["#burç", z.hashtag, "#astroloji", "#burçyorumu", "#keşfet"],
+      });
+    }
+    case "number": {
+      const n = getNumberById(id);
+      if (!n) break;
+      if (n.kind === "lifepath") {
+        return igAssemble({
+          hook: `Yaşam yolu sayın ${n.number} ise 🔢 gerçek karakterin bu`,
+          body: meaningsBlock(n.meanings),
+          reflection: `${n.questionBody.replace(/\n/g, " ")} — ${n.questionFooter}`,
+          save: "Kaydet — kendini tanı",
+          share: `Yaşam yolu ${n.number} olan birine gönder`,
+          comment: "Senin yaşam yolu sayın kaç?",
+          hashtags: ["#numeroloji", "#yaşamyolu", "#astroloji", "#mistik", "#keşfet"],
+        });
+      }
+      return igAssemble({
+        hook: `Sürekli ${n.number} mı görüyorsun? 👁️ Tesadüf değil`,
+        body: meaningsBlock(n.meanings),
+        reflection: `${n.questionBody.replace(/\n/g, " ")} — ${n.questionFooter}`,
+        save: "Kaydet — işaret bu",
+        share: `Sürekli ${n.number} gören birine gönder`,
+        comment: "Sen hangi sayıyı görüyorsun?",
+        hashtags: ["#melekSayıları", `#${n.number}`, "#manifest", "#spiritüel", "#keşfet"],
+      });
+    }
+    case "manifest": {
+      const m = getManifestById(id);
+      if (!m) break;
+      return igAssemble({
+        hook: `${m.theme} için günlük manifesto 🌙 yüksek sesle oku`,
+        body: m.lines.map((l) => `✨ ${l}`),
+        reflection: "Yüksek sesle söyle — niyetini gerçeğe çağır.",
+        save: "Kaydet — her gün oku",
+        share: "Bunu duyması gereken birine gönder",
+        comment: "Sen neyi manifest ediyorsun?",
+        hashtags: ["#manifest", "#olumlama", "#çekimyasası", "#spiritüel", "#keşfet"],
+      });
+    }
+  }
+  throw new Error(`IG caption üretilemedi: ${category}/${id}`);
+}

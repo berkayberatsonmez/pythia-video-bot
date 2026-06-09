@@ -24,6 +24,10 @@ const OUTPUT_DIR = join(process.cwd(), "out", "daily");
 const DO_UPLOAD = process.argv.includes("--upload");
 const DO_INSTAGRAM = process.argv.includes("--instagram");
 const UPLOAD_NOW = process.argv.includes("--now");
+// --slot morning|evening → sadece o slotun videosunu işle (IG zamanlı paylaşım için)
+const SLOT_FILTER = process.argv.includes("--slot")
+  ? process.argv[process.argv.indexOf("--slot") + 1]
+  : null;
 const PRIVACY = process.argv.includes("--privacy")
   ? process.argv[process.argv.indexOf("--privacy") + 1]
   : "public";
@@ -94,7 +98,11 @@ function renderOne(v: SelectedVideo): string {
 async function main() {
   if (!existsSync(OUTPUT_DIR)) mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  const picks = getTodaysVideos();
+  let picks = getTodaysVideos();
+  if (SLOT_FILTER) {
+    picks = picks.filter((v) => v.slot === SLOT_FILTER);
+    console.log(`🎯 Slot filtresi: ${SLOT_FILTER} → ${picks.length} video`);
+  }
 
   console.log(`\n🌙 Pythia Rotasyon — ${todayStamp()}`);
   console.log(`   Mod: ${DO_UPLOAD ? `RENDER + UPLOAD (${PRIVACY})` : "sadece RENDER"}`);

@@ -4,7 +4,9 @@ name: Pythia Günlük Video
 # YouTube zamanlı yayını sayesinde videolar doğru saatte otomatik public olur.
 on:
   schedule:
-    - cron: "0 5 * * *"
+    - cron: "0 5 * * *" # 08:00 TR — YouTube (zamanlı 13:00 + 20:00)
+    - cron: "0 10 * * *" # 13:00 TR — Instagram (sabah videosu, anında)
+    - cron: "0 18 * * *" # 21:00 TR — Instagram (akşam videosu, anında)
   workflow_dispatch: # Actions sekmesinden manuel tetikleme
     inputs:
       mode:
@@ -62,12 +64,20 @@ jobs:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          MODE="${{ github.event.inputs.mode || 'both' }}"
-          echo "▶ Mode: $MODE"
-          if [ "$MODE" = "instagram" ]; then
-            npm run rotation -- --instagram
-          elif [ "$MODE" = "youtube" ]; then
-            npm run rotation -- --upload
+          MODE="${{ github.event.inputs.mode }}"
+          SCHED="${{ github.event.schedule }}"
+          if [ -n "$MODE" ]; then
+            echo "▶ Manuel: $MODE"
+            case "$MODE" in
+              instagram) npm run rotation -- --instagram ;;
+              youtube)   npm run rotation -- --upload ;;
+              *)         npm run rotation -- --upload --instagram ;;
+            esac
           else
-            npm run rotation -- --upload --instagram
+            echo "▶ Zamanlı: $SCHED"
+            case "$SCHED" in
+              "0 10 * * *") npm run rotation -- --instagram --slot morning ;;
+              "0 18 * * *") npm run rotation -- --instagram --slot evening ;;
+              *)            npm run rotation -- --upload ;;
+            esac
           fi
