@@ -47,6 +47,37 @@ async function igGet(path: string, params: Record<string, string>): Promise<any>
   return json;
 }
 
+// ─── Kapak (cover) — videonun "reveal" anından kare seç (ms cinsinden) ────
+// IG thumb_offset: o milisaniyedeki kare profil grid + Reels sekmesi kapağı olur.
+const COVER_OFFSET_MS: Record<string, number> = {
+  dream: 3800, // sembol ikonu + ismi belirir
+  tarot: 4200, // kart oturur + ismi
+  number: 3800, // büyük sayı + başlık
+  zodiac: 3800, // altın glif + burç adı
+  manifest: 1800, // tema başlığı
+};
+
+// ─── Mükerrer koruması — bu kanca son ~20 saatte paylaşıldı mı? ───────────
+// IG'nin kendi son gönderilerini kontrol eder (cron çift-tetik, manuel+zamanlı
+// çakışma, yeniden çalıştırma → aynı video 2. kez paylaşılmaz).
+async function alreadyPostedRecently(hookLine: string): Promise<boolean> {
+  try {
+    const res = await igGet("me/media", {
+      fields: "caption,timestamp",
+      limit: "25",
+    });
+    const now = Date.now();
+    return (res.data || []).some((m: any) => {
+      if (!m.caption || !m.timestamp) return false;
+      const sameHook = String(m.caption).split("\n")[0].trim() === hookLine;
+      const recent = now - new Date(m.timestamp).getTime() < 20 * 3600 * 1000;
+      return sameHook && recent;
+    });
+  } catch {
+    return false; // kontrol edilemezse engelleme, normal akışa devam
+  }
+}
+
 // ─── IG caption: Instagram'a ÖZEL üretici (metadata.ts) ───────────────────
 export function buildReelCaption(category: string, id: string): string {
   return buildInstagramCaption(category, id);
@@ -83,14 +114,20 @@ function deleteReleaseAsset(tag: string, videoPath: string): void {
 }
 
 // ─── Reels yayınla (3 adım) ──────────────────────────────────────────────
-export async function publishReel(videoUrl: string, caption: string): Promise<string> {
-  // 1) Container oluştur
+export async function publishReel(
+  videoUrl: string,
+  caption: string,
+  thumbOffsetMs?: number,
+): Promise<string> {
+  // 1) Container oluştur (kapak = thumb_offset ile videodan seçilen kare)
   console.log(`   📦 Container oluşturuluyor...`);
-  const container = await igPost("me/media", {
+  const params: Record<string, string> = {
     media_type: "REELS",
     video_url: videoUrl,
     caption,
-  });
+  };
+  if (thumbOffsetMs != null) params.thumb_offset = String(thumbOffsetMs);
+  const container = await igPost("me/media", params);
   const creationId: string = container.id;
 
   // 2) Video işlenene kadar bekle (poll, ~max 4 dk)
@@ -123,10 +160,18 @@ export async function postReelFromFile(
   id: string,
   tag: string,
 ): Promise<string> {
+  const caption = buildReelCaption(category, id);
+
+  // Mükerrer koruması: aynı kanca son 20 saatte paylaşıldıysa atla
+  const hookLine = caption.split("\n")[0].trim();
+  if (await alreadyPostedRecently(hookLine)) {
+    console.log(`   ⏭️ Zaten yakın zamanda paylaşılmış, atlanıyor (${category}/${id})`);
+    return "skipped";
+  }
+
   const url = uploadToRelease(videoPath, tag);
   console.log(`   🌍 Public URL: ${url}`);
-  const caption = buildReelCaption(category, id);
-  const mediaId = await publishReel(url, caption);
+  const mediaId = await publishReel(url, caption, COVER_OFFSET_MS[category]);
   // Sadece başarıda temizle (hata olursa asset debug için kalsın)
   deleteReleaseAsset(tag, videoPath);
   return mediaId;

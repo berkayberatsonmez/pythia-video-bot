@@ -151,7 +151,11 @@ async function main() {
     for (const { v, path } of rendered) {
       try {
         const mediaId = await postReelFromFile(path, v.category, v.id, "reels");
-        console.log(`   ✅ ${v.label} → Reels yayında (media ${mediaId})`);
+        if (mediaId === "skipped") {
+          console.log(`   ⏭️ ${v.label} → atlandı (mükerrer koruması)`);
+        } else {
+          console.log(`   ✅ ${v.label} → Reels yayında (media ${mediaId})`);
+        }
       } catch (e) {
         console.error(`   ❌ IG yayın başarısız (${v.label} ${v.id}):`, e);
       }
