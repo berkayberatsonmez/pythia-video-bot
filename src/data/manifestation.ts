@@ -148,6 +148,71 @@ export const MANIFESTATIONS: Manifesto[] = [
     ],
     hashtag: "#manifesto",
   },
+  {
+    id: "protection",
+    theme: "KORUNMA",
+    themeSub: "güvende hisset",
+    prompt: "ZOR GÜNDE BUNU OKU",
+    lines: [
+      "Güvendeyim, korunuyorum.",
+      "Negatif enerji bana işlemez.",
+      "Etrafımı ışık sarıyor.",
+      "Hiçbir şey huzurumu bozamaz.",
+    ],
+    hashtag: "#manifesto",
+  },
+  {
+    id: "newbeginning",
+    theme: "YENİ BAŞLANGIÇ",
+    themeSub: "sayfayı çevir",
+    prompt: "YENİ BİR DÖNEMDE OKU",
+    lines: [
+      "Geçmişi geride bırakıyorum.",
+      "Yeni bir sayfa açılıyor.",
+      "Her gün taze bir başlangıç.",
+      "En güzeli daha gelmedi.",
+    ],
+    hashtag: "#manifesto",
+  },
+  {
+    id: "courage",
+    theme: "CESARET",
+    themeSub: "korkunu yen",
+    prompt: "KARAR ÖNCESİ OKU",
+    lines: [
+      "Korkularım beni durduramaz.",
+      "Cesaret zaten içimde.",
+      "Risk almaya hazırım.",
+      "Adımı atıyorum, ilerliyorum.",
+    ],
+    hashtag: "#manifesto",
+  },
+  {
+    id: "attraction",
+    theme: "ÇEKİM",
+    themeSub: "istediğini çek",
+    prompt: "HER SABAH SÖYLE",
+    lines: [
+      "İstediğim her şeyi çekiyorum.",
+      "Evren benden yana çalışıyor.",
+      "Fırsatlar bana akıyor.",
+      "Hak ettiğim bana geliyor.",
+    ],
+    hashtag: "#manifesto",
+  },
+  {
+    id: "forgiveness",
+    theme: "AFFETME",
+    themeSub: "yükünü bırak",
+    prompt: "İÇİN AĞIRSA OKU",
+    lines: [
+      "Kendimi affediyorum.",
+      "Geçmişin yükünü bırakıyorum.",
+      "Kin tutmak bana zarar verir.",
+      "Hafiflemeyi seçiyorum.",
+    ],
+    hashtag: "#manifesto",
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

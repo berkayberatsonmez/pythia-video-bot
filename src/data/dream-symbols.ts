@@ -15,7 +15,19 @@ export type IconType =
   | "flying"
   | "dead"
   | "key"
-  | "eye";
+  | "eye"
+  | "baby"
+  | "broken-heart"
+  | "dog"
+  | "cat"
+  | "blood"
+  | "money"
+  | "wedding"
+  | "car"
+  | "house"
+  | "hair"
+  | "lost"
+  | "crying";
 
 export type DreamSymbol = {
   id: string;
@@ -303,6 +315,222 @@ export const DREAM_SYMBOLS: DreamSymbol[] = [
     questionBody: "tanıdık mıydı,\nyoksa yabancı mıydı?",
     questionFooter: "tanışıklık, mesajın kaynağını söyler",
     hashtag: "#göz",
+    searchVolume: "medium",
+  },
+
+  // ─── 11. BEBEK ───────────────────────────────────────────────────────
+  {
+    id: "baby",
+    symbolName: "bebek",
+    symbolNameUpper: "BEBEK",
+    iconType: "baby",
+    meanings: [
+      { title: "YENİ BAŞLANGIÇ", desc: "Hayatında yeni bir şey\ndoğuyor. Bir proje, fikir\nya da dönem filizleniyor." },
+      { title: "MASUMİYET", desc: "İçindeki saf, korunmasız\nyana dokunuyorsun.\nKendine nazik ol." },
+      { title: "SORUMLULUK", desc: "Bakım isteyen bir şey var.\nBir ilişki ya da hedef\nilgini bekliyor." },
+    ],
+    questionTitle: "PEKİ SENİN BEBEĞİN",
+    questionBody: "gülüyor muydu,\nyoksa ağlıyor mu?",
+    questionFooter: "hali, başlangıcın enerjisini söyler",
+    hashtag: "#bebek",
+    searchVolume: "high",
+  },
+
+  // ─── 12. ESKİ SEVGİLİ ────────────────────────────────────────────────
+  {
+    id: "ex",
+    symbolName: "eski sevgili",
+    symbolNameUpper: "ESKİ\nSEVGİLİYİ",
+    iconType: "broken-heart",
+    meanings: [
+      { title: "ÇÖZÜLMEMİŞ", desc: "Kapanmamış bir defter var.\nBilinçaltın hâlâ o bağı\nişliyor olabilir." },
+      { title: "DERS", desc: "O kişi değil, sana\nöğrettiği şey önemli.\nDersi al, ileriye bak." },
+      { title: "YENİ DÖNGÜ", desc: "Aslında bu bir veda.\nEski sen gidiyor, yeni\naşka yer açılıyor." },
+    ],
+    questionTitle: "RÜYANDA O",
+    questionBody: "sana iyi mi davrandı,\nyoksa kötü mü?",
+    questionFooter: "tavrı, içindeki duyguyu yansıtır",
+    hashtag: "#eskisevgili",
+    searchVolume: "high",
+  },
+
+  // ─── 13. KÖPEK ───────────────────────────────────────────────────────
+  {
+    id: "dog",
+    symbolName: "köpek",
+    symbolNameUpper: "KÖPEK",
+    iconType: "dog",
+    meanings: [
+      { title: "SADAKAT", desc: "Hayatında sadık bir\ndostluk var ya da onu\narıyorsun." },
+      { title: "KORUMA", desc: "İçgüdülerin seni koruyor.\nBir tehlikeyi sezdin,\ndinle onu." },
+      { title: "DOSTLUK", desc: "Gerçek bir dosta\nihtiyacın var. Yalnız\ndeğilsin, etrafına bak." },
+    ],
+    questionTitle: "PEKİ SENİN KÖPEĞİN",
+    questionBody: "dost canlısı mıydı,\nyoksa saldırgan mı?",
+    questionFooter: "tavrı, ilişkilerini yansıtır",
+    hashtag: "#köpek",
+    searchVolume: "high",
+  },
+
+  // ─── 14. KEDİ ────────────────────────────────────────────────────────
+  {
+    id: "cat",
+    symbolName: "kedi",
+    symbolNameUpper: "KEDİ",
+    iconType: "cat",
+    meanings: [
+      { title: "BAĞIMSIZLIK", desc: "Özgür ruhun konuşuyor.\nKimseye bağımlı olmadan\nayakta durmak istiyorsun." },
+      { title: "SEZGİ", desc: "Dişil enerjin ve sezgilerin\nçok güçlü. Görünmeyeni\nseziyorsun." },
+      { title: "GİZEM", desc: "Hayatında saklı bir şey var.\nBir sır ya da gizli\nbir taraf açığa çıkıyor." },
+    ],
+    questionTitle: "PEKİ SENİN KEDİN",
+    questionBody: "sana yakın mıydı,\nyoksa uzak mı durdu?",
+    questionFooter: "mesafesi, sezgine işaret eder",
+    hashtag: "#kedi",
+    searchVolume: "high",
+  },
+
+  // ─── 15. KAN ─────────────────────────────────────────────────────────
+  {
+    id: "blood",
+    symbolName: "kan",
+    symbolNameUpper: "KAN",
+    iconType: "blood",
+    meanings: [
+      { title: "YAŞAM ENERJİSİ", desc: "Kan = can. Bir tutku,\nbir canlılık ya da\nkaybedilen enerji." },
+      { title: "AİLE BAĞI", desc: "Kan bağı — aile konuları\ngündemde. Bir akraba\nya da kök meselesi." },
+      { title: "KAYIP/FEDAKARLIK", desc: "Bir şeyden vazgeçiyorsun.\nVerdiğin emek, ödediğin\nbedel sembolize ediliyor." },
+    ],
+    questionTitle: "RÜYANDAKİ KAN",
+    questionBody: "senin miydi,\nyoksa başkasının mı?",
+    questionFooter: "kaynağı, konunun yönünü gösterir",
+    hashtag: "#kan",
+    searchVolume: "high",
+  },
+
+  // ─── 16. PARA ────────────────────────────────────────────────────────
+  {
+    id: "money",
+    symbolName: "para",
+    symbolNameUpper: "PARA",
+    iconType: "money",
+    meanings: [
+      { title: "ÖZ DEĞER", desc: "Para çoğu zaman öz değeri\nsembolize eder. Kendine\nbiçtiğin değeri sorgula." },
+      { title: "FIRSAT", desc: "Bir fırsat ya da bolluk\nyaklaşıyor. Gözünü aç,\nkapıyı kaçırma." },
+      { title: "GÜÇ/KONTROL", desc: "Hayatının kontrolüyle\nilgili bir mesaj. Güç\ndengesi değişiyor." },
+    ],
+    questionTitle: "RÜYANDA PARAYI",
+    questionBody: "buldun mu,\nyoksa kaybettin mi?",
+    questionFooter: "buluş/kayıp, akışını gösterir",
+    hashtag: "#para",
+    searchVolume: "high",
+  },
+
+  // ─── 17. DÜĞÜN ───────────────────────────────────────────────────────
+  {
+    id: "wedding",
+    symbolName: "düğün",
+    symbolNameUpper: "DÜĞÜN",
+    iconType: "wedding",
+    meanings: [
+      { title: "BİRLEŞME", desc: "İçindeki zıt parçalar\nbirleşiyor. Bir bütünleşme,\nbir uyum yaklaşıyor." },
+      { title: "YENİ DÖNEM", desc: "Hayatında büyük bir\ngeçiş var. Eski biter,\nyeni resmen başlar." },
+      { title: "TAAHHÜT", desc: "Bir karara bağlanma\nzamanı. Bir söz, bir\nadanma seni bekliyor." },
+    ],
+    questionTitle: "RÜYANDAKİ DÜĞÜN",
+    questionBody: "mutlu muydu,\nyoksa huzursuz mu?",
+    questionFooter: "havası, geçişin doğasını söyler",
+    hashtag: "#düğün",
+    searchVolume: "medium",
+  },
+
+  // ─── 18. ARABA ───────────────────────────────────────────────────────
+  {
+    id: "car",
+    symbolName: "araba",
+    symbolNameUpper: "ARABA",
+    iconType: "car",
+    meanings: [
+      { title: "HAYAT YÖNÜ", desc: "Araba = hayat yolculuğun.\nNereye gittiğin, ne kadar\nkontrolde olduğun." },
+      { title: "KONTROL", desc: "Direksiyon kimde? Hayatının\nkontrolünü elinde tutup\ntutmadığını sorgula." },
+      { title: "İLERLEME", desc: "Bir hedefe doğru\nilerliyorsun. Hız ve yön\nsana ipucu veriyor." },
+    ],
+    questionTitle: "ARABAYI",
+    questionBody: "sen mi sürüyordun,\nyoksa başkası mı?",
+    questionFooter: "sürücü, kontrolün kimde olduğunu söyler",
+    hashtag: "#araba",
+    searchVolume: "medium",
+  },
+
+  // ─── 19. EV ──────────────────────────────────────────────────────────
+  {
+    id: "house",
+    symbolName: "ev",
+    symbolNameUpper: "EV",
+    iconType: "house",
+    meanings: [
+      { title: "BENLİK", desc: "Ev = sensin. Odaları\nbenliğinin farklı yanlarını\ntemsil eder." },
+      { title: "GÜVENLİK", desc: "Güvende hissetme\nihtiyacın var. İç huzurunu\narıyorsun." },
+      { title: "İÇ DÜNYA", desc: "Bilinçaltına bir yolculuk.\nKeşfedilmemiş odalar\nyeni keşifler demek." },
+    ],
+    questionTitle: "RÜYANDAKİ EV",
+    questionBody: "tanıdık mıydı,\nyoksa yabancı mı?",
+    questionFooter: "tanışıklık, kendinle bağını gösterir",
+    hashtag: "#ev",
+    searchVolume: "medium",
+  },
+
+  // ─── 20. SAÇ ─────────────────────────────────────────────────────────
+  {
+    id: "hair",
+    symbolName: "saç",
+    symbolNameUpper: "SAÇ",
+    iconType: "hair",
+    meanings: [
+      { title: "GÜÇ & ÖZGÜVEN", desc: "Saç = güç ve kimlik.\nÖzgüvenin ve enerjinle\nilgili bir mesaj." },
+      { title: "DEĞİŞİM", desc: "Saç kesmek/uzamak\ndönüşüm demek. Hayatında\nbir şey değişiyor." },
+      { title: "KAYGI", desc: "Saç dökülmesi gördüysen\nbir kontrol/güç kaybı\nkorkusu olabilir." },
+    ],
+    questionTitle: "RÜYANDA SAÇIN",
+    questionBody: "uzadı mı,\nyoksa döküldü/kesildi mi?",
+    questionFooter: "değişimi, dönüşümünü gösterir",
+    hashtag: "#saç",
+    searchVolume: "medium",
+  },
+
+  // ─── 21. KAYBOLMAK ───────────────────────────────────────────────────
+  {
+    id: "lost",
+    symbolName: "kaybolmak",
+    symbolNameUpper: "KAYBOLDUĞUNU",
+    iconType: "lost",
+    meanings: [
+      { title: "YÖN KAYBI", desc: "Hayatında bir yol ayrımındasın.\nNereye gideceğinden\nemin değilsin." },
+      { title: "BELİRSİZLİK", desc: "Bir konuda kafan karışık.\nNetlik gelene kadar\nacele etme." },
+      { title: "ARAYIŞ", desc: "Aslında kendini arıyorsun.\nKaybolmak bazen bulmanın\nilk adımıdır." },
+    ],
+    questionTitle: "RÜYANDA",
+    questionBody: "panikledin mi,\nyoksa sakin miydin?",
+    questionFooter: "tepkin, içsel durumunu gösterir",
+    hashtag: "#kaybolmak",
+    searchVolume: "medium",
+  },
+
+  // ─── 22. AĞLAMAK ─────────────────────────────────────────────────────
+  {
+    id: "crying",
+    symbolName: "ağlamak",
+    symbolNameUpper: "AĞLADIĞINI",
+    iconType: "crying",
+    meanings: [
+      { title: "ARINMA", desc: "Gözyaşı temizler.\nBiriken duygular boşalıyor,\nbu aslında şifa." },
+      { title: "BASTIRILMIŞ HİS", desc: "Gündüz tutamadığın\nduygular geceye taşıyor.\nKendine izin ver." },
+      { title: "RAHATLAMA", desc: "Ağlamak çoğu zaman\nferahlama işaretidir.\nYükün hafifliyor." },
+    ],
+    questionTitle: "RÜYANDA",
+    questionBody: "hüzünden mi,\nyoksa mutluluktan mı?",
+    questionFooter: "sebebi, duygunun kaynağını söyler",
+    hashtag: "#ağlamak",
     searchVolume: "medium",
   },
 ];
