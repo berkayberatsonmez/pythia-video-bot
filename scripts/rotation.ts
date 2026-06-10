@@ -28,12 +28,19 @@ type Pool = {
   label: string;
 };
 
+// Rüya sembollerini arama hacmine göre sırala (yüksek önce) → en çok aranan
+// içerik ("rüyada yılan/diş görmek" gibi) önce ve daha sık paylaşılsın.
+const SEARCH_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+const DREAM_IDS_BY_SEARCH = [...DREAM_SYMBOLS]
+  .sort((a, b) => SEARCH_RANK[a.searchVolume] - SEARCH_RANK[b.searchVolume])
+  .map((s) => s.id);
+
 export const POOLS: Record<PoolKey, Pool> = {
   dream: {
     comp: "DreamSymbolVideo",
     key: "symbolId",
     category: "dream",
-    ids: DREAM_SYMBOLS.map((s) => s.id),
+    ids: DREAM_IDS_BY_SEARCH,
     label: "🌙 Rüya",
   },
   tarot: {
@@ -89,28 +96,46 @@ export type SelectedVideo = {
 const POOL_ORDER: PoolKey[] = [
   "dream",
   "tarot",
+  "zodiac",
   "numerology",
   "angel",
-  "zodiac",
   "manifest",
 ];
 
+// İzlenme için ağırlık: popüler/yüksek-aramalı kategoriler daha sık paylaşılır.
+// (Rüya/tarot/burç = en çok aranan mistik konular >> numeroloji/melek/manifest)
+const POOL_WEIGHTS: Record<PoolKey, number> = {
+  dream: 2,
+  tarot: 2,
+  zodiac: 2,
+  numerology: 1,
+  angel: 1,
+  manifest: 1,
+};
+
+// Ağırlıklı round-robin: her turda her pooldan WEIGHT kadar eleman al →
+// popülerler daha sık çıkar ama hepsi sırayla, tekrarsız. Deterministik.
 function buildSequence(): SelectedVideo[] {
   const seq: SelectedVideo[] = [];
-  const maxLen = Math.max(...POOL_ORDER.map((k) => POOLS[k].ids.length));
-  for (let i = 0; i < maxLen; i++) {
+  const cursor: Record<string, number> = {};
+  for (const k of POOL_ORDER) cursor[k] = 0;
+  const total = POOL_ORDER.reduce((s, k) => s + POOLS[k].ids.length, 0);
+  while (seq.length < total) {
     for (const k of POOL_ORDER) {
       const pool = POOLS[k];
-      if (i < pool.ids.length) {
-        seq.push({
-          slot: "morning", // slot sonradan atanır
-          poolKey: k,
-          label: pool.label,
-          comp: pool.comp,
-          category: pool.category,
-          propKey: pool.key,
-          id: pool.ids[i],
-        });
+      for (let w = 0; w < POOL_WEIGHTS[k]; w++) {
+        if (cursor[k] < pool.ids.length) {
+          seq.push({
+            slot: "morning", // slot sonradan atanır
+            poolKey: k,
+            label: pool.label,
+            comp: pool.comp,
+            category: pool.category,
+            propKey: pool.key,
+            id: pool.ids[cursor[k]],
+          });
+          cursor[k]++;
+        }
       }
     }
   }
@@ -149,5 +174,16 @@ if (process.argv.includes("--preview")) {
     console.log(`  ${slotTime}  ${p.label}  →  ${p.id}`);
     console.log(`         npm run video -- ${p.category} ${p.id}\n`);
   }
-  console.log(`Toplam havuz: ${SEQUENCE.length} video\n`);
+  // Diagnostik: ağırlık dağılımı + tekrarsızlık kontrolü
+  const dist: Record<string, number> = {};
+  for (const s of SEQUENCE) dist[s.poolKey] = (dist[s.poolKey] || 0) + 1;
+  const keys = SEQUENCE.map((s) => `${s.category}:${s.id}`);
+  const unique = new Set(keys).size;
+  console.log(`📊 Dağılım:`, dist);
+  console.log(
+    `   Toplam: ${SEQUENCE.length} · Tekil: ${unique} ${unique === SEQUENCE.length ? "(tekrar YOK ✅)" : "(⚠️ TEKRAR VAR!)"}`,
+  );
+  console.log(
+    `   İlk 12 sıra: ${SEQUENCE.slice(0, 12).map((s) => s.poolKey).join(" → ")}\n`,
+  );
 }
