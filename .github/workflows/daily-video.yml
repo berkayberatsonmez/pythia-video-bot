@@ -1,7 +1,7 @@
 name: Pythia Günlük Video
 
-# Her gün 05:00 UTC (08:00 TR) — render eder, 13:00 ve 20:00 TR'ye zamanlı yükler.
-# YouTube zamanlı yayını sayesinde videolar doğru saatte otomatik public olur.
+# 3 zamanlı cron (UTC): 03:41 YouTube yükle (YT 13:00/20:00 TR'ye zamanlı yayınlar),
+# 10:07 Instagram sabah Reels, 18:07 Instagram akşam Reels. (TR = UTC+3, DST yok)
 on:
   schedule:
     # NOT: Tam-saat (:00) cron'ları GitHub'da yoğunlukta saatlerce gecikiyor.
