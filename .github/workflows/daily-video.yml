@@ -4,11 +4,14 @@ name: Pythia Günlük Video
 # 10:07 Instagram sabah Reels, 18:07 Instagram akşam Reels. (TR = UTC+3, DST yok)
 on:
   schedule:
-    # NOT: Tam-saat (:00) cron'ları GitHub'da yoğunlukta saatlerce gecikiyor.
-    # "Garip dakika"lara kaydırdık → kuyruk boş, çok daha dakik çalışır.
-    - cron: "41 3 * * *" # ~06:41 TR — YouTube (erken + tampon; YT 13:00/20:00 zamanlı yayınlar)
-    - cron: "7 10 * * *" # ~13:07 TR — Instagram (sabah videosu, anında)
-    - cron: "7 18 * * *" # ~21:07 TR — Instagram (akşam videosu, anında)
+    # GitHub cron'u bu repoda ~4-5 saat gecikiyor (garip dakika bile çözmedi).
+    # IG için DAKİK zamanlama: cron-job.org → repository_dispatch (aşağıda).
+    # Aşağıdaki cron'lar YEDEK — geç de olsa atsınlar; dedup mükerreri engeller.
+    - cron: "41 3 * * *" # YouTube (gecikme tolere eder — server-side 13:00/20:00 yayınlar)
+    - cron: "7 10 * * *" # IG sabah (yedek)
+    - cron: "7 18 * * *" # IG akşam (yedek)
+  repository_dispatch: # cron-job.org dış tetiği — DAKİK IG zamanlaması (asıl yol)
+    types: [ig-morning, ig-evening]
   workflow_dispatch: # Actions sekmesinden manuel tetikleme
     inputs:
       mode:
@@ -67,22 +70,31 @@ jobs:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          MODE="${{ github.event.inputs.mode }}"
-          SCHED="${{ github.event.schedule }}"
-          if [ -n "$MODE" ]; then
+          EVENT="${{ github.event_name }}"
+          if [ "$EVENT" = "repository_dispatch" ]; then
+            ACTION="${{ github.event.action }}"
+            echo "▶ Dış tetik (dakik): $ACTION"
+            case "$ACTION" in
+              ig-morning) npm run rotation -- --instagram --slot morning ;;
+              ig-evening) npm run rotation -- --instagram --slot evening ;;
+              *)          echo "⚠️ Bilinmeyen dispatch ($ACTION) — atlanıyor" ;;
+            esac
+          elif [ "$EVENT" = "schedule" ]; then
+            SCHED="${{ github.event.schedule }}"
+            echo "▶ Zamanlı (GitHub cron, yedek): $SCHED"
+            case "$SCHED" in
+              "41 3 * * *") npm run rotation -- --upload ;;
+              "7 10 * * *") npm run rotation -- --instagram --slot morning ;;
+              "7 18 * * *") npm run rotation -- --instagram --slot evening ;;
+              *)            echo "⚠️ Bilinmeyen schedule ($SCHED) — atlanıyor" ;;
+            esac
+          else
+            MODE="${{ github.event.inputs.mode }}"
             echo "▶ Manuel: $MODE"
             case "$MODE" in
               instagram)   npm run rotation -- --instagram ;;
               youtube)     npm run rotation -- --upload ;;
               commenttest) npx tsx scripts/upload-instagram.ts --comment-test ;;
               *)           npm run rotation -- --upload --instagram ;;
-            esac
-          else
-            echo "▶ Zamanlı: $SCHED"
-            case "$SCHED" in
-              "41 3 * * *") npm run rotation -- --upload ;;
-              "7 10 * * *") npm run rotation -- --instagram --slot morning ;;
-              "7 18 * * *") npm run rotation -- --instagram --slot evening ;;
-              *)            echo "⚠️ Bilinmeyen schedule ($SCHED) — güvenlik için atlanıyor" ;;
             esac
           fi
