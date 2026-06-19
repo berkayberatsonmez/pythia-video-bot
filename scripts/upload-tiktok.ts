@@ -145,6 +145,16 @@ export async function postToTikTokFromFile(
       "utf-8",
     );
     console.log(`  📝 Caption kaydedildi: ${capPath}`);
+    // Caption + ilk yorumu Actions log'una da bas — telefondan run log'undan
+    // kopyalanabilsin (.tiktok.txt bulut runner'da kalir, telefona inmez).
+    console.log("\n" + "=".repeat(56));
+    console.log("📋 TIKTOK CAPTION (drafts'tan yayinlarken bunu yapistir):");
+    console.log("-".repeat(56));
+    console.log(caption);
+    console.log("-".repeat(56));
+    console.log("💬 ILK YORUM (yayinlayinca ekle + sabitle):");
+    console.log(firstComment);
+    console.log("=".repeat(56) + "\n");
     return publishId;
   } catch (e) {
     console.error(`  ✗ TikTok upload başarısız:`, e);
