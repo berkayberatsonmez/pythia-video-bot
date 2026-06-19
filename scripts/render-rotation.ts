@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { getTodaysVideos, type SelectedVideo } from "./rotation";
 import { authorize, uploadVideoFile } from "./upload-youtube";
 import { postReelFromFile } from "./upload-instagram";
+import { postToTikTokFromFile } from "./upload-tiktok";
 
 const OUTPUT_DIR = join(process.cwd(), "out", "daily");
 
@@ -23,6 +24,7 @@ const OUTPUT_DIR = join(process.cwd(), "out", "daily");
 //   --privacy <p>   --now ile birlikte gizlilik (public/unlisted/private)
 const DO_UPLOAD = process.argv.includes("--upload");
 const DO_INSTAGRAM = process.argv.includes("--instagram");
+const DO_TIKTOK = process.argv.includes("--tiktok");
 const UPLOAD_NOW = process.argv.includes("--now");
 // --slot morning|evening → sadece o slotun videosunu işle (IG zamanlı paylaşım için)
 const SLOT_FILTER = process.argv.includes("--slot")
@@ -161,6 +163,23 @@ async function main() {
       }
     }
     console.log(`\n🎉 Instagram Reels tamamlandı!`);
+  }
+
+  // 4) TikTok (opsiyonel) — drafts/inbox'a yükle; caption .tiktok.txt yanına.
+  //    inbox upload caption set etmez → telefondan yayınlarken yapıştırılır.
+  if (DO_TIKTOK) {
+    console.log(`\n🎵 TikTok drafts'a yükleniyor...`);
+    for (const { v, path } of rendered) {
+      const pid = await postToTikTokFromFile(path, v.category, v.id);
+      if (pid) {
+        console.log(`   ✅ ${v.label} → TikTok drafts (publish_id ${pid})`);
+      } else {
+        console.log(`   ❌ ${v.label} → TikTok upload başarısız`);
+      }
+    }
+    console.log(
+      `\n🎉 TikTok tamamlandı — telefondan Inbox/Drafts'tan yayınla (caption .tiktok.txt'de).`,
+    );
   }
 
   console.log();

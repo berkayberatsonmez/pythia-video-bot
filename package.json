@@ -36,7 +36,8 @@
     "daily": "tsx scripts/render-rotation.ts --upload --instagram",
     "instagram:test": "tsx scripts/render-rotation.ts --instagram",
     "upload:youtube": "tsx scripts/upload-youtube.ts",
-    "upload:instagram": "tsx scripts/upload-instagram.ts"
+    "upload:instagram": "tsx scripts/upload-instagram.ts",
+    "upload:tiktok": "tsx scripts/upload-tiktok.ts"
   },
   "sideEffects": [
     "*.css"
