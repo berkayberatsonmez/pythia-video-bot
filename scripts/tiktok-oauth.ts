@@ -1,22 +1,17 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // tiktok-oauth.ts — BİR KERELİK: TikTok refresh_token al + 3 GitHub secret'ını kur
 //
-// Redirect URI: https://berkayberatsonmez.github.io/oauth-callback.html
-//   (TikTok app "Pythia" → Login Kit → Web sekmesinde ZATEN KAYITLI. Ekleme yok.)
+// 2 AŞAMA (interaktif giriş yok — Windows'ta sağlam):
+//   1) npx tsx scripts/tiktok-oauth.ts           → yetki URL'ini yazar
+//   2) (tarayıcıda izin ver → mor sayfadaki kodu kopyala)
+//   3) npx tsx scripts/tiktok-oauth.ts 'KOD'     → token al + 3 secret'ı kur
 //
-// Akış: script auth URL'i basar → tarayıcıda @pythiamystic ile izin ver →
-// callback sayfası KODU gösterir (Kopyala butonu) → kodu buraya yapıştır →
-// token'a çevrilir → 3 secret `gh` ile repo'ya yazılır.
-// Değerler ekrana BASILMAZ, sohbete düşmez.
-//
-// Çalıştırma (PowerShell, remotion-hello-world klasöründe):
-//   $env:TIKTOK_CLIENT_KEY="awxxxx"; $env:TIKTOK_CLIENT_SECRET="xxxx"; npx tsx scripts/tiktok-oauth.ts
-//   (env vermezsen script soracak)
+// Redirect URI: https://berkayberatsonmez.github.io/oauth-callback.html (app'te KAYITLI).
+// Env GEREKLİ (PowerShell):  $env:TIKTOK_CLIENT_KEY="aw..."; $env:TIKTOK_CLIENT_SECRET="..."
+// Değerler ekrana BASILMAZ, sohbete düşmez (gh ile yazılır).
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { spawnSync } from "node:child_process";
-import { createInterface } from "node:readline/promises";
-import { stdin, stdout } from "node:process";
 
 const REPO = "berkayberatsonmez/pythia-video-bot";
 const REDIRECT_URI = "https://berkayberatsonmez.github.io/oauth-callback.html";
@@ -24,14 +19,6 @@ const SCOPES = "user.info.basic,video.upload,video.list";
 const AUTH_BASE = "https://www.tiktok.com/v2/auth/authorize/";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 
-async function ask(q: string): Promise<string> {
-  const rl = createInterface({ input: stdin, output: stdout });
-  const a = await rl.question(q);
-  rl.close();
-  return a.trim();
-}
-
-// Secret'ı gh ile yaz (değer ekrana basılmaz)
 function setSecret(name: string, value: string): void {
   const r = spawnSync(
     "gh",
@@ -44,7 +31,7 @@ function setSecret(name: string, value: string): void {
   console.log(`   ✓ ${name} kuruldu`);
 }
 
-// Yapıştırılan girdi tam URL ise içinden code'u çıkar; değilse olduğu gibi kullan
+// Argüman tam URL ise içinden code'u çıkar; değilse olduğu gibi kullan
 function extractCode(input: string): string {
   const s = input.trim();
   if (s.includes("code=")) {
@@ -60,36 +47,40 @@ function extractCode(input: string): string {
 }
 
 async function main(): Promise<void> {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY || (await ask("TikTok CLIENT_KEY: "));
-  const clientSecret = process.env.TIKTOK_CLIENT_SECRET || (await ask("TikTok CLIENT_SECRET: "));
+  const clientKey = process.env.TIKTOK_CLIENT_KEY;
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
   if (!clientKey || !clientSecret) {
-    console.error("❌ CLIENT_KEY ve CLIENT_SECRET zorunlu.");
+    console.error("❌ Env eksik. PowerShell'de önce şunları çalıştır:");
+    console.error('   $env:TIKTOK_CLIENT_KEY="aw..."');
+    console.error('   $env:TIKTOK_CLIENT_SECRET="..."');
     process.exit(1);
   }
 
-  const state = "pythia_" + Math.random().toString(36).slice(2, 12);
-  const authUrl =
-    `${AUTH_BASE}?client_key=${encodeURIComponent(clientKey)}` +
-    `&scope=${encodeURIComponent(SCOPES)}` +
-    `&response_type=code` +
-    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-    `&state=${state}`;
+  const codeArg = process.argv[2];
 
-  console.log("\n" + "═".repeat(66));
-  console.log("1) Şu URL'yi tarayıcıda AÇ → @pythiamystic ile giriş → Authorize:");
-  console.log("─".repeat(66));
-  console.log(authUrl);
-  console.log("═".repeat(66));
-  console.log("\n2) Açılan sayfa KODU gösterir (mor 'Kopyala' butonu). Kopyala.\n");
-
-  const raw = await ask("3) Kodu (veya tüm URL'i) yapıştır + Enter:\n   ");
-  const code = extractCode(raw);
-  if (!code) {
-    console.error("❌ Kod boş.");
-    process.exit(1);
+  // ── 1. AŞAMA: argüman yoksa yetki URL'ini yaz ──
+  if (!codeArg) {
+    const state = "pythia_" + Math.random().toString(36).slice(2, 12);
+    const authUrl =
+      `${AUTH_BASE}?client_key=${encodeURIComponent(clientKey)}` +
+      `&scope=${encodeURIComponent(SCOPES)}` +
+      `&response_type=code` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&state=${state}`;
+    console.log("\n" + "═".repeat(66));
+    console.log("1) Şu URL'yi tarayıcıda AÇ → @pythiamystic ile giriş → Authorize:");
+    console.log("─".repeat(66));
+    console.log(authUrl);
+    console.log("═".repeat(66));
+    console.log("\n2) Açılan MOR sayfadaki kodu 'Kopyala' butonuyla al.");
+    console.log("\n3) Sonra ŞU komutu çalıştır (kodu TEK TIRNAK içine koy):");
+    console.log("   npx tsx scripts/tiktok-oauth.ts 'BURAYA_KODU_YAPISTIR'\n");
+    process.exit(0);
   }
-  console.log("   ✓ Kod alındı, token'a çevriliyor...");
 
+  // ── 2. AŞAMA: code → token → secret'lar ──
+  const code = extractCode(codeArg);
+  console.log("Kod alındı, token'a çevriliyor...");
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -109,18 +100,17 @@ async function main(): Promise<void> {
   };
   if (!res.ok || !j.refresh_token) {
     console.error("❌ Token alınamadı:", JSON.stringify(j));
-    console.error("   (Yetki kodu TEK KULLANIMLIK + ~10 dk geçerli. Süre dolduysa URL'i tekrar aç, yeni kod al.)");
+    console.error("   (Kod TEK KULLANIMLIK + ~10 dk geçerli. Süre dolduysa 1. aşamayı tekrar çalıştır, YENİ kod al.)");
     process.exit(1);
   }
   console.log(`   ✓ refresh_token alındı (scope: ${j.scope ?? "?"})\n`);
 
-  console.log("4) GitHub secret'ları yazılıyor...");
+  console.log("GitHub secret'ları yazılıyor...");
   setSecret("TIKTOK_CLIENT_KEY", clientKey);
   setSecret("TIKTOK_CLIENT_SECRET", clientSecret);
   setSecret("TIKTOK_REFRESH_TOKEN", j.refresh_token);
 
   console.log("\n🎉 BİTTİ! 3 secret kuruldu. Artık her IG slotunda video TikTok drafts'a düşecek.");
-  console.log("   Sonraki adım: ben doğrularım (secret'lar + sıradaki slotta drafts'a düştü mü).");
   process.exit(0);
 }
 
