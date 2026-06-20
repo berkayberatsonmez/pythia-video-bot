@@ -22,6 +22,7 @@ on:
           - both
           - instagram
           - youtube
+          - tiktok
           - commenttest
         default: both
 
@@ -98,6 +99,7 @@ jobs:
             case "$MODE" in
               instagram)   npm run rotation -- --instagram --tiktok ;;
               youtube)     npm run rotation -- --upload ;;
+              tiktok)      npm run rotation -- --tiktok --slot morning ;; # SADECE TikTok drafts (IG/YT yok) — test/manuel
               commenttest) npx tsx scripts/upload-instagram.ts --comment-test ;;
               *)           npm run rotation -- --upload --instagram --tiktok ;;
             esac
