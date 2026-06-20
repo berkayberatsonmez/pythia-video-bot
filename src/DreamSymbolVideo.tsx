@@ -12,6 +12,7 @@ import {
 import type { DreamSymbol } from "./data/dream-symbols";
 import { SymbolIcon } from "./components/SymbolIcon";
 import { BackgroundMusic } from "./components/shared";
+import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 
 const GOLD = "#D4A843";
 
@@ -25,6 +26,7 @@ const GOLD = "#D4A843";
 
 export type DreamSymbolVideoProps = {
   symbol: DreamSymbol;
+  voiceover?: Voiceover;
 };
 
 // ─── Star field ──────────────────────────────────────────────────────────
@@ -86,13 +88,19 @@ const StarField: React.FC = () => {
 };
 
 // ─── Hook — "RÜYANDA X GÖRDÜYSEN" ────────────────────────────────────────
-const Hook: React.FC<{ symbolUpper: string }> = ({ symbolUpper }) => {
+const Hook: React.FC<{ symbolUpper: string; durFrames?: number }> = ({
+  symbolUpper,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
+  // sürekli yavaş drift (statik durmasın → TikTok "statik AI" cezasına karşı)
+  const drift = Math.sin(frame * 0.04) * 8;
   const opacity = interpolate(
     frame,
-    [0, 0.4 * fps, 2 * fps, 2.5 * fps],
+    [0, 0.4 * fps, d - 0.45 * fps, d],
     [0, 1, 1, 0],
     { extrapolateRight: "clamp" },
   );
@@ -112,7 +120,7 @@ const Hook: React.FC<{ symbolUpper: string }> = ({ symbolUpper }) => {
       <div
         style={{
           opacity,
-          transform: `scale(${scale})`,
+          transform: `scale(${scale}) translateY(${drift}px)`,
           textAlign: "center",
           padding: "0 60px",
         }}
@@ -159,9 +167,13 @@ const Hook: React.FC<{ symbolUpper: string }> = ({ symbolUpper }) => {
 };
 
 // ─── Symbol reveal — büyük ikon, glow, animasyon ─────────────────────────
-const SymbolReveal: React.FC<{ symbol: DreamSymbol }> = ({ symbol }) => {
+const SymbolReveal: React.FC<{ symbol: DreamSymbol; durFrames?: number }> = ({
+  symbol,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
   const appearSpring = spring({
     frame,
@@ -176,8 +188,10 @@ const SymbolReveal: React.FC<{ symbol: DreamSymbol }> = ({ symbol }) => {
 
   // Glow pulse after settling
   const glow = (Math.sin(frame * 0.1) + 1) * 0.5;
+  // yavaş sürekli nefes (statik kalmasın)
+  const breathe = 1 + Math.sin(frame * 0.05) * 0.03;
 
-  const fadeOut = interpolate(frame, [2 * fps, 2.5 * fps], [1, 0], {
+  const fadeOut = interpolate(frame, [d - 0.5 * fps, d], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -187,7 +201,7 @@ const SymbolReveal: React.FC<{ symbol: DreamSymbol }> = ({ symbol }) => {
       <div
         style={{
           opacity: opacity * fadeOut,
-          transform: `scale(${scale}) rotate(${rotate}deg)`,
+          transform: `scale(${scale * breathe}) rotate(${rotate}deg)`,
           filter: `drop-shadow(0 0 ${40 + glow * 50}px rgba(212, 168, 67, ${
             0.6 + glow * 0.4
           }))`,
@@ -204,7 +218,8 @@ const MeaningCard: React.FC<{
   number: string;
   title: string;
   desc: string;
-}> = ({ number, title, desc }) => {
+  durFrames?: number;
+}> = ({ number, title, desc, durFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -215,7 +230,8 @@ const MeaningCard: React.FC<{
     durationInFrames: 0.6 * fps,
   });
 
-  const exitFade = interpolate(frame, [2 * fps, 2.3 * fps], [1, 0], {
+  const exitStart = durFrames ? durFrames - 0.35 * fps : 2 * fps;
+  const exitFade = interpolate(frame, [exitStart, exitStart + 0.3 * fps], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -286,13 +302,16 @@ const Question: React.FC<{
   title: string;
   body: string;
   footer: string;
-}> = ({ title, body, footer }) => {
+  durFrames?: number;
+}> = ({ title, body, footer, durFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
+  const holdEnd = durFrames ? durFrames - 0.4 * fps : 1.1 * fps;
+  const end = durFrames ? durFrames : 1.5 * fps;
   const opacity = interpolate(
     frame,
-    [0, 0.4 * fps, 1.1 * fps, 1.5 * fps],
+    [0, 0.4 * fps, holdEnd, end],
     [0, 1, 1, 0],
     { extrapolateRight: "clamp" },
   );
@@ -430,8 +449,10 @@ const LogoCta: React.FC = () => {
 
 export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
   symbol,
+  voiceover,
 }) => {
   const { fps } = useVideoConfig();
+  const g = getSegs(voiceover, fps);
 
   return (
     <AbsoluteFill
@@ -441,56 +462,61 @@ export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
       }}
     >
       <StarField />
-      <BackgroundMusic />
+      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {voiceover && <VoiceTrack vo={voiceover} />}
 
-      {/* [0-2.5s] Hook */}
-      <Sequence durationInFrames={2.5 * fps} layout="none">
-        <Hook symbolUpper={symbol.symbolNameUpper} />
+      {/* Hook */}
+      <Sequence durationInFrames={g.hook.dur} layout="none">
+        <Hook symbolUpper={symbol.symbolNameUpper} durFrames={g.hook.dur} />
       </Sequence>
 
-      {/* [2.5-5s] Symbol reveal */}
-      <Sequence from={2.5 * fps} durationInFrames={2.5 * fps} layout="none">
-        <SymbolReveal symbol={symbol} />
+      {/* Symbol reveal */}
+      <Sequence from={g.reveal.from} durationInFrames={g.reveal.dur} layout="none">
+        <SymbolReveal symbol={symbol} durFrames={g.reveal.dur} />
       </Sequence>
 
-      {/* [5-7.3s] Meaning 1 */}
-      <Sequence from={5 * fps} durationInFrames={2.3 * fps} layout="none">
+      {/* Meaning 1 */}
+      <Sequence from={g.m1.from} durationInFrames={g.m1.dur} layout="none">
         <MeaningCard
           number="1"
           title={symbol.meanings[0].title}
           desc={symbol.meanings[0].desc}
+          durFrames={g.m1.dur}
         />
       </Sequence>
 
-      {/* [7.3-9.6s] Meaning 2 */}
-      <Sequence from={7.3 * fps} durationInFrames={2.3 * fps} layout="none">
+      {/* Meaning 2 */}
+      <Sequence from={g.m2.from} durationInFrames={g.m2.dur} layout="none">
         <MeaningCard
           number="2"
           title={symbol.meanings[1].title}
           desc={symbol.meanings[1].desc}
+          durFrames={g.m2.dur}
         />
       </Sequence>
 
-      {/* [9.6-11.9s] Meaning 3 */}
-      <Sequence from={9.6 * fps} durationInFrames={2.3 * fps} layout="none">
+      {/* Meaning 3 */}
+      <Sequence from={g.m3.from} durationInFrames={g.m3.dur} layout="none">
         <MeaningCard
           number="3"
           title={symbol.meanings[2].title}
           desc={symbol.meanings[2].desc}
+          durFrames={g.m3.dur}
         />
       </Sequence>
 
-      {/* [11.9-13.4s] Question */}
-      <Sequence from={11.9 * fps} durationInFrames={1.5 * fps} layout="none">
+      {/* Question */}
+      <Sequence from={g.q.from} durationInFrames={g.q.dur} layout="none">
         <Question
           title={symbol.questionTitle}
           body={symbol.questionBody}
           footer={symbol.questionFooter}
+          durFrames={g.q.dur}
         />
       </Sequence>
 
-      {/* [13.4-15s] Logo + CTA */}
-      <Sequence from={13.4 * fps} durationInFrames={1.6 * fps} layout="none">
+      {/* Logo + CTA */}
+      <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
         <LogoCta />
       </Sequence>
     </AbsoluteFill>

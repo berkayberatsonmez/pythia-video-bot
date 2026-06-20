@@ -110,7 +110,8 @@ export const MeaningCard: React.FC<{
   number: string;
   title: string;
   desc: string;
-}> = ({ number, title, desc }) => {
+  durFrames?: number; // sesli modda segment süresi (verilirse sona göre fade)
+}> = ({ number, title, desc, durFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -120,7 +121,8 @@ export const MeaningCard: React.FC<{
     config: { damping: 14, stiffness: 100 },
     durationInFrames: 0.6 * fps,
   });
-  const exitFade = interpolate(frame, [2 * fps, 2.3 * fps], [1, 0], {
+  const exitStart = durFrames ? durFrames - 0.35 * fps : 2 * fps;
+  const exitFade = interpolate(frame, [exitStart, exitStart + 0.3 * fps], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -182,13 +184,16 @@ export const Question: React.FC<{
   title: string;
   body: string;
   footer: string;
-}> = ({ title, body, footer }) => {
+  durFrames?: number; // sesli modda segment süresi
+}> = ({ title, body, footer, durFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
+  const holdEnd = durFrames ? durFrames - 0.4 * fps : 1.1 * fps;
+  const end = durFrames ? durFrames : 1.5 * fps;
   const opacity = interpolate(
     frame,
-    [0, 0.4 * fps, 1.1 * fps, 1.5 * fps],
+    [0, 0.4 * fps, holdEnd, end],
     [0, 1, 1, 0],
     { extrapolateRight: "clamp" },
   );

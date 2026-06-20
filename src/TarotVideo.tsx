@@ -19,22 +19,29 @@ import {
   Question,
   LogoCta,
 } from "./components/shared";
+import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Tarot video — "Bugün senin kartın: X"
 // Gerçek kart görseli public/tarot/XX.webp kullanır.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type TarotVideoProps = { card: TarotCard };
+export type TarotVideoProps = { card: TarotCard; voiceover?: Voiceover };
 
 // ─── Hook — "BUGÜN SENİN KARTIN" ─────────────────────────────────────────
-const Hook: React.FC<{ energy: string }> = ({ energy }) => {
+const Hook: React.FC<{ energy: string; durFrames?: number }> = ({
+  energy,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
+  // sürekli yavaş drift (statik durmasın → TikTok "statik AI" cezasına karşı)
+  const drift = Math.sin(frame * 0.04) * 8;
   const opacity = interpolate(
     frame,
-    [0, 0.4 * fps, 2 * fps, 2.5 * fps],
+    [0, 0.4 * fps, d - 0.45 * fps, d],
     [0, 1, 1, 0],
     { extrapolateRight: "clamp" },
   );
@@ -47,7 +54,13 @@ const Hook: React.FC<{ energy: string }> = ({ energy }) => {
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      <div style={{ opacity, transform: `scale(${scale})`, textAlign: "center" }}>
+      <div
+        style={{
+          opacity,
+          transform: `scale(${scale}) translateY(${drift}px)`,
+          textAlign: "center",
+        }}
+      >
         <div
           style={{
             fontSize: 52,
@@ -89,9 +102,13 @@ const Hook: React.FC<{ energy: string }> = ({ energy }) => {
 };
 
 // ─── Card reveal — gerçek kart görseli + isim ────────────────────────────
-const CardReveal: React.FC<{ card: TarotCard }> = ({ card }) => {
+const CardReveal: React.FC<{ card: TarotCard; durFrames?: number }> = ({
+  card,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 3 * fps;
 
   // Kart aşağıdan uçar gelir
   const cardSpring = spring({
@@ -104,6 +121,8 @@ const CardReveal: React.FC<{ card: TarotCard }> = ({ card }) => {
   const cardScale = interpolate(cardSpring, [0, 1], [0.5, 1]);
   const cardRotate = interpolate(cardSpring, [0, 1], [-10, 0]);
   const glow = (Math.sin(frame * 0.1) + 1) * 0.5;
+  // yavaş sürekli nefes (statik kalmasın)
+  const breathe = 1 + Math.sin(frame * 0.05) * 0.03;
 
   // İsim kart oturduktan sonra belirir (~1.3s)
   const nameOpacity = interpolate(
@@ -114,7 +133,7 @@ const CardReveal: React.FC<{ card: TarotCard }> = ({ card }) => {
   );
 
   // Sekans sonunda fade out
-  const fadeOut = interpolate(frame, [2.5 * fps, 3 * fps], [1, 0], {
+  const fadeOut = interpolate(frame, [d - 0.5 * fps, d], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -130,7 +149,7 @@ const CardReveal: React.FC<{ card: TarotCard }> = ({ card }) => {
     >
       <div
         style={{
-          transform: `translateY(${cardY}px) scale(${cardScale}) rotate(${cardRotate}deg)`,
+          transform: `translateY(${cardY}px) scale(${cardScale * breathe}) rotate(${cardRotate}deg)`,
           filter: `drop-shadow(0 0 ${40 + glow * 50}px rgba(212, 168, 67, ${
             0.5 + glow * 0.4
           }))`,
@@ -186,50 +205,53 @@ const CardReveal: React.FC<{ card: TarotCard }> = ({ card }) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const TarotVideo: React.FC<TarotVideoProps> = ({ card }) => {
+export const TarotVideo: React.FC<TarotVideoProps> = ({ card, voiceover }) => {
   const { fps } = useVideoConfig();
+  const g = getSegs(voiceover, fps);
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic />
+      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {voiceover && <VoiceTrack vo={voiceover} />}
 
-      {/* [0-2.5s] Hook */}
-      <Sequence durationInFrames={2.5 * fps} layout="none">
-        <Hook energy={card.energy} />
+      {/* Hook */}
+      <Sequence durationInFrames={g.hook.dur} layout="none">
+        <Hook energy={card.energy} durFrames={g.hook.dur} />
       </Sequence>
 
-      {/* [2.5-5.5s] Card reveal */}
-      <Sequence from={2.5 * fps} durationInFrames={3 * fps} layout="none">
-        <CardReveal card={card} />
+      {/* Card reveal */}
+      <Sequence from={g.reveal.from} durationInFrames={g.reveal.dur} layout="none">
+        <CardReveal card={card} durFrames={g.reveal.dur} />
       </Sequence>
 
-      {/* [5.5-7.5s] Meaning 1 */}
-      <Sequence from={5.5 * fps} durationInFrames={2 * fps} layout="none">
-        <MeaningCard number="1" title={card.meanings[0].title} desc={card.meanings[0].desc} />
+      {/* Meaning 1 */}
+      <Sequence from={g.m1.from} durationInFrames={g.m1.dur} layout="none">
+        <MeaningCard number="1" title={card.meanings[0].title} desc={card.meanings[0].desc} durFrames={g.m1.dur} />
       </Sequence>
 
-      {/* [7.5-9.5s] Meaning 2 */}
-      <Sequence from={7.5 * fps} durationInFrames={2 * fps} layout="none">
-        <MeaningCard number="2" title={card.meanings[1].title} desc={card.meanings[1].desc} />
+      {/* Meaning 2 */}
+      <Sequence from={g.m2.from} durationInFrames={g.m2.dur} layout="none">
+        <MeaningCard number="2" title={card.meanings[1].title} desc={card.meanings[1].desc} durFrames={g.m2.dur} />
       </Sequence>
 
-      {/* [9.5-11.5s] Meaning 3 */}
-      <Sequence from={9.5 * fps} durationInFrames={2 * fps} layout="none">
-        <MeaningCard number="3" title={card.meanings[2].title} desc={card.meanings[2].desc} />
+      {/* Meaning 3 */}
+      <Sequence from={g.m3.from} durationInFrames={g.m3.dur} layout="none">
+        <MeaningCard number="3" title={card.meanings[2].title} desc={card.meanings[2].desc} durFrames={g.m3.dur} />
       </Sequence>
 
-      {/* [11.5-13s] Question */}
-      <Sequence from={11.5 * fps} durationInFrames={1.5 * fps} layout="none">
+      {/* Question */}
+      <Sequence from={g.q.from} durationInFrames={g.q.dur} layout="none">
         <Question
           title={card.questionTitle}
           body={card.questionBody}
           footer={card.questionFooter}
+          durFrames={g.q.dur}
         />
       </Sequence>
 
-      {/* [13-15s] Logo CTA */}
-      <Sequence from={13 * fps} durationInFrames={2 * fps} layout="none">
+      {/* Logo CTA */}
+      <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
         <LogoCta subtitle="AI ile detaylı tarot yorumu" />
       </Sequence>
     </AbsoluteFill>

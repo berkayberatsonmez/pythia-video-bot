@@ -16,35 +16,51 @@ import { ZodiacVideo } from "./ZodiacVideo";
 import { ZODIAC_SIGNS, getZodiacById } from "./data/zodiac-signs";
 import { ManifestVideo } from "./ManifestVideo";
 import { MANIFESTATIONS, getManifestById } from "./data/manifestation";
+import { voiceoverTotalFrames, type Voiceover } from "./components/voiceover";
 
 // ─── Wrapper — symbolId → full symbol lookup ────────────────────────────
-const DreamSymbolWrapper: React.FC<{ symbolId: string }> = ({ symbolId }) => {
+const DreamSymbolWrapper: React.FC<{
+  symbolId: string;
+  voiceover?: Voiceover;
+}> = ({ symbolId, voiceover }) => {
   const symbol = getSymbolById(symbolId) ?? DREAM_SYMBOLS[0];
-  return <DreamSymbolVideo symbol={symbol} />;
+  return <DreamSymbolVideo symbol={symbol} voiceover={voiceover} />;
 };
 
 // ─── Wrapper — tarot cardId → full card lookup ──────────────────────────
-const TarotWrapper: React.FC<{ cardId: string }> = ({ cardId }) => {
+const TarotWrapper: React.FC<{ cardId: string; voiceover?: Voiceover }> = ({
+  cardId,
+  voiceover,
+}) => {
   const card = getTarotById(cardId) ?? TAROT_CARDS[0];
-  return <TarotVideo card={card} />;
+  return <TarotVideo card={card} voiceover={voiceover} />;
 };
 
 // ─── Wrapper — number id → full content lookup ──────────────────────────
-const NumberWrapper: React.FC<{ numberId: string }> = ({ numberId }) => {
+const NumberWrapper: React.FC<{ numberId: string; voiceover?: Voiceover }> = ({
+  numberId,
+  voiceover,
+}) => {
   const content = getNumberById(numberId) ?? NUMBERS[0];
-  return <NumberVideo content={content} />;
+  return <NumberVideo content={content} voiceover={voiceover} />;
 };
 
 // ─── Wrapper — zodiac id → full sign lookup ─────────────────────────────
-const ZodiacWrapper: React.FC<{ signId: string }> = ({ signId }) => {
+const ZodiacWrapper: React.FC<{ signId: string; voiceover?: Voiceover }> = ({
+  signId,
+  voiceover,
+}) => {
   const sign = getZodiacById(signId) ?? ZODIAC_SIGNS[0];
-  return <ZodiacVideo sign={sign} />;
+  return <ZodiacVideo sign={sign} voiceover={voiceover} />;
 };
 
 // ─── Wrapper — manifest id → full content lookup ────────────────────────
-const ManifestWrapper: React.FC<{ manifestId: string }> = ({ manifestId }) => {
+const ManifestWrapper: React.FC<{
+  manifestId: string;
+  voiceover?: Voiceover;
+}> = ({ manifestId, voiceover }) => {
   const content = getManifestById(manifestId) ?? MANIFESTATIONS[0];
-  return <ManifestVideo content={content} />;
+  return <ManifestVideo content={content} voiceover={voiceover} />;
 };
 
 export const RemotionRoot: React.FC = () => {
@@ -61,6 +77,11 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ symbolId: "snake" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
       />
 
       {/* ═══ TAROT — 22 Major Arcana ════════════════════════════════ */}
@@ -74,6 +95,11 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ cardId: "star" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
       />
 
       {/* ═══ NUMEROLOJİ + MELEK SAYILARI — 21 sayı ══════════════════ */}
@@ -87,6 +113,11 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ numberId: "a111" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
       />
 
       {/* ═══ BURÇ — 12 burç (gizli yüz) ═════════════════════════════ */}
@@ -99,6 +130,11 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ signId: "scorpio" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
       />
 
       {/* ═══ MANİFEST — 12 teknik + ay fazları ══════════════════════ */}
@@ -111,6 +147,11 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ manifestId: "confidence" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
       />
 
       {/* ═══ Eski (specific) compositions — referans için ═══════════ */}

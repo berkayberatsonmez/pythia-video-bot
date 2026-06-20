@@ -8,6 +8,8 @@
   "dependencies": {
     "@remotion/cli": "4.0.473",
     "@remotion/tailwind-v4": "4.0.473",
+    "msedge-tts": "^2.0.6",
+    "music-metadata": "^11.13.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.473",

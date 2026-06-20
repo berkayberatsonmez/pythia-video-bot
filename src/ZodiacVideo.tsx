@@ -18,13 +18,15 @@ import {
   Question,
   LogoCta,
 } from "./components/shared";
+import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Zodiac video — "X burcunun gizli yüzü"
-// SVG glyph CSS mask ile altın renge boyanır + glow.
+// Ses-güdümlü: voiceover prop'u varsa segmentler ses süresine göre boyutlanır
+// (+ seslendirme + kısık müzik). Yoksa eski sabit 15sn düzen (Studio önizleme).
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ZodiacVideoProps = { sign: ZodiacSign };
+export type ZodiacVideoProps = { sign: ZodiacSign; voiceover?: Voiceover };
 
 // ─── Altın glyph (CSS mask tekniği) ──────────────────────────────────────
 const GoldGlyph: React.FC<{ svgFile: string; size: number; glow: number }> = ({
@@ -56,13 +58,19 @@ const GoldGlyph: React.FC<{ svgFile: string; size: number; glow: number }> = ({
 };
 
 // ─── Hook — "X BURCUNUN GİZLİ YÜZÜ" ──────────────────────────────────────
-const Hook: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
+const Hook: React.FC<{ sign: ZodiacSign; durFrames?: number }> = ({
+  sign,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
+  // sürekli yavaş drift (statik durmasın → TikTok "statik AI" cezasına karşı)
+  const drift = Math.sin(frame * 0.04) * 8;
   const opacity = interpolate(
     frame,
-    [0, 0.4 * fps, 2 * fps, 2.5 * fps],
+    [0, 0.4 * fps, d - 0.45 * fps, d],
     [0, 1, 1, 0],
     { extrapolateRight: "clamp" },
   );
@@ -75,7 +83,13 @@ const Hook: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      <div style={{ opacity, transform: `scale(${scale})`, textAlign: "center" }}>
+      <div
+        style={{
+          opacity,
+          transform: `scale(${scale}) translateY(${drift}px)`,
+          textAlign: "center",
+        }}
+      >
         <div
           style={{
             fontSize: 100,
@@ -118,9 +132,13 @@ const Hook: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
 };
 
 // ─── Glyph reveal — altın burç sembolü + isim ────────────────────────────
-const GlyphReveal: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
+const GlyphReveal: React.FC<{ sign: ZodiacSign; durFrames?: number }> = ({
+  sign,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
   const enter = spring({
     frame,
@@ -132,12 +150,14 @@ const GlyphReveal: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
   const rotate = interpolate(enter, [0, 1], [-40, 0]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
   const glow = (Math.sin(frame * 0.1) + 1) * 0.5;
+  // yavaş sürekli nefes (statik kalmasın)
+  const breathe = 1 + Math.sin(frame * 0.05) * 0.03;
 
   const nameOpacity = interpolate(frame, [0.9 * fps, 1.4 * fps], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const fadeOut = interpolate(frame, [2 * fps, 2.5 * fps], [1, 0], {
+  const fadeOut = interpolate(frame, [d - 0.5 * fps, d], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -151,7 +171,12 @@ const GlyphReveal: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
         opacity: fadeOut,
       }}
     >
-      <div style={{ transform: `scale(${scale}) rotate(${rotate}deg)`, opacity }}>
+      <div
+        style={{
+          transform: `scale(${scale * breathe}) rotate(${rotate}deg)`,
+          opacity,
+        }}
+      >
         <GoldGlyph svgFile={sign.svgFile} size={340} glow={glow} />
       </div>
       <div style={{ opacity: nameOpacity, marginTop: 30, textAlign: "center" }}>
@@ -186,50 +211,46 @@ const GlyphReveal: React.FC<{ sign: ZodiacSign }> = ({ sign }) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const ZodiacVideo: React.FC<ZodiacVideoProps> = ({ sign }) => {
+export const ZodiacVideo: React.FC<ZodiacVideoProps> = ({ sign, voiceover }) => {
   const { fps } = useVideoConfig();
+  const g = getSegs(voiceover, fps);
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic />
+      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {voiceover && <VoiceTrack vo={voiceover} />}
 
-      {/* [0-2.5s] Hook */}
-      <Sequence durationInFrames={2.5 * fps} layout="none">
-        <Hook sign={sign} />
+      <Sequence durationInFrames={g.hook.dur} layout="none">
+        <Hook sign={sign} durFrames={g.hook.dur} />
       </Sequence>
 
-      {/* [2.5-5s] Glyph reveal */}
-      <Sequence from={2.5 * fps} durationInFrames={2.5 * fps} layout="none">
-        <GlyphReveal sign={sign} />
+      <Sequence from={g.reveal.from} durationInFrames={g.reveal.dur} layout="none">
+        <GlyphReveal sign={sign} durFrames={g.reveal.dur} />
       </Sequence>
 
-      {/* [5-7.3s] Meaning 1 */}
-      <Sequence from={5 * fps} durationInFrames={2.3 * fps} layout="none">
-        <MeaningCard number="1" title={sign.meanings[0].title} desc={sign.meanings[0].desc} />
+      <Sequence from={g.m1.from} durationInFrames={g.m1.dur} layout="none">
+        <MeaningCard number="1" title={sign.meanings[0].title} desc={sign.meanings[0].desc} durFrames={g.m1.dur} />
       </Sequence>
 
-      {/* [7.3-9.6s] Meaning 2 */}
-      <Sequence from={7.3 * fps} durationInFrames={2.3 * fps} layout="none">
-        <MeaningCard number="2" title={sign.meanings[1].title} desc={sign.meanings[1].desc} />
+      <Sequence from={g.m2.from} durationInFrames={g.m2.dur} layout="none">
+        <MeaningCard number="2" title={sign.meanings[1].title} desc={sign.meanings[1].desc} durFrames={g.m2.dur} />
       </Sequence>
 
-      {/* [9.6-11.9s] Meaning 3 */}
-      <Sequence from={9.6 * fps} durationInFrames={2.3 * fps} layout="none">
-        <MeaningCard number="3" title={sign.meanings[2].title} desc={sign.meanings[2].desc} />
+      <Sequence from={g.m3.from} durationInFrames={g.m3.dur} layout="none">
+        <MeaningCard number="3" title={sign.meanings[2].title} desc={sign.meanings[2].desc} durFrames={g.m3.dur} />
       </Sequence>
 
-      {/* [11.9-13.4s] Question */}
-      <Sequence from={11.9 * fps} durationInFrames={1.5 * fps} layout="none">
+      <Sequence from={g.q.from} durationInFrames={g.q.dur} layout="none">
         <Question
           title={sign.questionTitle}
           body={sign.questionBody}
           footer={sign.questionFooter}
+          durFrames={g.q.dur}
         />
       </Sequence>
 
-      {/* [13.4-15s] Logo CTA */}
-      <Sequence from={13.4 * fps} durationInFrames={1.6 * fps} layout="none">
+      <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
         <LogoCta subtitle="AI ile detaylı burç yorumu" />
       </Sequence>
     </AbsoluteFill>

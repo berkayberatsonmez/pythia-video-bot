@@ -15,6 +15,8 @@ import { getTodaysVideos, type SelectedVideo } from "./rotation";
 import { authorize, uploadVideoFile } from "./upload-youtube";
 import { postReelFromFile } from "./upload-instagram";
 import { postToTikTokFromFile } from "./upload-tiktok";
+import { buildVoiceover } from "./voiceover-build";
+import type { Voiceover } from "../src/components/voiceover";
 
 const OUTPUT_DIR = join(process.cwd(), "out", "daily");
 
@@ -68,13 +70,15 @@ function todayStamp(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-function renderOne(v: SelectedVideo): string {
+function renderOne(v: SelectedVideo, voiceover: Voiceover | null): string {
   const outPath = join(
     OUTPUT_DIR,
     `${todayStamp()}_${v.slot}_${v.category}-${v.id}.mp4`,
   );
   const propsFile = join(tmpdir(), `pythia-rot-${Date.now()}-${v.slot}.json`);
-  writeFileSync(propsFile, JSON.stringify({ [v.propKey]: v.id }));
+  const props: Record<string, unknown> = { [v.propKey]: v.id };
+  if (voiceover) props.voiceover = voiceover;
+  writeFileSync(propsFile, JSON.stringify(props));
 
   console.log(`\n🎬 ${v.label} → ${v.id}  (${v.slot})`);
   console.log(`   ${outPath}`);
@@ -113,7 +117,18 @@ async function main() {
   // 1) Render
   const rendered: { v: SelectedVideo; path: string }[] = [];
   for (const v of picks) {
-    const path = renderOne(v);
+    // Seslendirme üret (başarısızsa sessiz fallback — videoyu bozma)
+    let voiceover: Voiceover | null = null;
+    try {
+      voiceover = await buildVoiceover(v.category, v.id);
+      if (voiceover) console.log(`   🎙 Seslendirme hazır (${v.category}/${v.id})`);
+    } catch (e) {
+      console.error(
+        `   ⚠️ Seslendirme atlandı (${v.category}/${v.id}):`,
+        e instanceof Error ? e.message : e,
+      );
+    }
+    const path = renderOne(v, voiceover);
     rendered.push({ v, path });
   }
 

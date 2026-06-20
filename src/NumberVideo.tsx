@@ -17,6 +17,7 @@ import {
   Question,
   LogoCta,
 } from "./components/shared";
+import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Number video — numeroloji + melek sayıları (büyük sayı animasyonu)
@@ -24,16 +25,22 @@ import {
 //   angel    → "Sürekli X görüyorsan"
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type NumberVideoProps = { content: NumberContent };
+export type NumberVideoProps = { content: NumberContent; voiceover?: Voiceover };
 
 // ─── Hook — sayıya göre değişir ──────────────────────────────────────────
-const Hook: React.FC<{ content: NumberContent }> = ({ content }) => {
+const Hook: React.FC<{ content: NumberContent; durFrames?: number }> = ({
+  content,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
+  // sürekli yavaş drift (statik durmasın → TikTok "statik AI" cezasına karşı)
+  const drift = Math.sin(frame * 0.04) * 8;
   const opacity = interpolate(
     frame,
-    [0, 0.4 * fps, 2 * fps, 2.5 * fps],
+    [0, 0.4 * fps, d - 0.45 * fps, d],
     [0, 1, 1, 0],
     { extrapolateRight: "clamp" },
   );
@@ -49,7 +56,13 @@ const Hook: React.FC<{ content: NumberContent }> = ({ content }) => {
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-      <div style={{ opacity, transform: `scale(${scale})`, textAlign: "center" }}>
+      <div
+        style={{
+          opacity,
+          transform: `scale(${scale}) translateY(${drift}px)`,
+          textAlign: "center",
+        }}
+      >
         <div
           style={{
             fontSize: 44,
@@ -79,9 +92,13 @@ const Hook: React.FC<{ content: NumberContent }> = ({ content }) => {
 };
 
 // ─── Number reveal — büyük sayı + başlık ─────────────────────────────────
-const NumberReveal: React.FC<{ content: NumberContent }> = ({ content }) => {
+const NumberReveal: React.FC<{ content: NumberContent; durFrames?: number }> = ({
+  content,
+  durFrames,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const d = durFrames ?? 2.5 * fps;
 
   const enter = spring({
     frame,
@@ -92,13 +109,15 @@ const NumberReveal: React.FC<{ content: NumberContent }> = ({ content }) => {
   const scale = interpolate(enter, [0, 1], [0.3, 1]);
   const opacity = interpolate(enter, [0, 1], [0, 1]);
   const glow = (Math.sin(frame * 0.1) + 1) * 0.5;
+  // yavaş sürekli nefes (statik kalmasın)
+  const breathe = 1 + Math.sin(frame * 0.05) * 0.03;
 
   const titleOpacity = interpolate(frame, [0.8 * fps, 1.3 * fps], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  const fadeOut = interpolate(frame, [2 * fps, 2.5 * fps], [1, 0], {
+  const fadeOut = interpolate(frame, [d - 0.5 * fps, d], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -114,7 +133,7 @@ const NumberReveal: React.FC<{ content: NumberContent }> = ({ content }) => {
     >
       <div
         style={{
-          transform: `scale(${scale})`,
+          transform: `scale(${scale * breathe})`,
           opacity,
           fontSize: content.number.length >= 4 ? 300 : 380,
           fontFamily: "Georgia, serif",
@@ -150,8 +169,12 @@ const NumberReveal: React.FC<{ content: NumberContent }> = ({ content }) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const NumberVideo: React.FC<NumberVideoProps> = ({ content }) => {
+export const NumberVideo: React.FC<NumberVideoProps> = ({
+  content,
+  voiceover,
+}) => {
   const { fps } = useVideoConfig();
+  const g = getSegs(voiceover, fps);
   const subtitle =
     content.kind === "lifepath"
       ? "AI ile detaylı numeroloji"
@@ -160,44 +183,46 @@ export const NumberVideo: React.FC<NumberVideoProps> = ({ content }) => {
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic />
+      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {voiceover && <VoiceTrack vo={voiceover} />}
 
-      {/* [0-2.5s] Hook */}
-      <Sequence durationInFrames={2.5 * fps} layout="none">
-        <Hook content={content} />
+      {/* Hook */}
+      <Sequence durationInFrames={g.hook.dur} layout="none">
+        <Hook content={content} durFrames={g.hook.dur} />
       </Sequence>
 
-      {/* [2.5-5s] Number reveal */}
-      <Sequence from={2.5 * fps} durationInFrames={2.5 * fps} layout="none">
-        <NumberReveal content={content} />
+      {/* Number reveal */}
+      <Sequence from={g.reveal.from} durationInFrames={g.reveal.dur} layout="none">
+        <NumberReveal content={content} durFrames={g.reveal.dur} />
       </Sequence>
 
-      {/* [5-7.3s] Meaning 1 */}
-      <Sequence from={5 * fps} durationInFrames={2.3 * fps} layout="none">
-        <MeaningCard number="1" title={content.meanings[0].title} desc={content.meanings[0].desc} />
+      {/* Meaning 1 */}
+      <Sequence from={g.m1.from} durationInFrames={g.m1.dur} layout="none">
+        <MeaningCard number="1" title={content.meanings[0].title} desc={content.meanings[0].desc} durFrames={g.m1.dur} />
       </Sequence>
 
-      {/* [7.3-9.6s] Meaning 2 */}
-      <Sequence from={7.3 * fps} durationInFrames={2.3 * fps} layout="none">
-        <MeaningCard number="2" title={content.meanings[1].title} desc={content.meanings[1].desc} />
+      {/* Meaning 2 */}
+      <Sequence from={g.m2.from} durationInFrames={g.m2.dur} layout="none">
+        <MeaningCard number="2" title={content.meanings[1].title} desc={content.meanings[1].desc} durFrames={g.m2.dur} />
       </Sequence>
 
-      {/* [9.6-11.9s] Meaning 3 */}
-      <Sequence from={9.6 * fps} durationInFrames={2.3 * fps} layout="none">
-        <MeaningCard number="3" title={content.meanings[2].title} desc={content.meanings[2].desc} />
+      {/* Meaning 3 */}
+      <Sequence from={g.m3.from} durationInFrames={g.m3.dur} layout="none">
+        <MeaningCard number="3" title={content.meanings[2].title} desc={content.meanings[2].desc} durFrames={g.m3.dur} />
       </Sequence>
 
-      {/* [11.9-13.4s] Question */}
-      <Sequence from={11.9 * fps} durationInFrames={1.5 * fps} layout="none">
+      {/* Question */}
+      <Sequence from={g.q.from} durationInFrames={g.q.dur} layout="none">
         <Question
           title={content.questionTitle}
           body={content.questionBody}
           footer={content.questionFooter}
+          durFrames={g.q.dur}
         />
       </Sequence>
 
-      {/* [13.4-15s] Logo CTA */}
-      <Sequence from={13.4 * fps} durationInFrames={1.6 * fps} layout="none">
+      {/* Logo CTA */}
+      <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
         <LogoCta subtitle={subtitle} />
       </Sequence>
     </AbsoluteFill>
