@@ -108,11 +108,6 @@ export function uploadToRelease(videoPath: string, tag: string): string {
   return `https://github.com/${REPO}/releases/download/${tag}/${encodeURIComponent(file)}`;
 }
 
-// ─── Yayınlanan asset'i sil (IG zaten çekti — storage şişmesin) ───────────
-function deleteReleaseAsset(tag: string, videoPath: string): void {
-  gh(`release delete-asset ${tag} "${basename(videoPath)}" --yes --repo ${REPO}`, true);
-}
-
 // ─── Yoruma bırak / sil (otomatik ilk yorum + izin testi için) ────────────
 export async function postComment(mediaId: string, message: string): Promise<string> {
   const r = await igPost(`${mediaId}/comments`, { message });
@@ -185,8 +180,8 @@ export async function postReelFromFile(
   const url = uploadToRelease(videoPath, tag);
   console.log(`   🌍 Public URL: ${url}`);
   const mediaId = await publishReel(url, caption, COVER_OFFSET_MS[category]);
-  // Sadece başarıda temizle (hata olursa asset debug için kalsın)
-  deleteReleaseAsset(tag, videoPath);
+  // Asset'i SİLMİYORUZ — TikTok'a elle yüklemek için Releases'te kalsın
+  console.log(`   💾 TikTok için indir: ${url}`);
 
   // İlk yorumu otomatik bırak (etkileşim) — hata olsa da yayını bozma
   try {
