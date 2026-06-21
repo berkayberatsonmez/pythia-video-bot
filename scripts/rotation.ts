@@ -13,6 +13,7 @@ import { ZODIAC_SIGNS } from "../src/data/zodiac-signs";
 import { MANIFESTATIONS } from "../src/data/manifestation";
 import { ZODIAC_RANKINGS } from "../src/data/zodiac-rankings";
 import { ZODIAC_BEHAVIORS } from "../src/data/zodiac-behaviors";
+import { ZODIAC_COMPATIBILITY } from "../src/data/zodiac-compatibility";
 
 export type PoolKey =
   | "dream"
@@ -22,7 +23,8 @@ export type PoolKey =
   | "zodiac"
   | "manifest"
   | "ranking"
-  | "behavior";
+  | "behavior"
+  | "compat";
 
 type Pool = {
   comp: string;
@@ -96,6 +98,13 @@ export const POOLS: Record<PoolKey, Pool> = {
     ids: ZODIAC_BEHAVIORS.map((b) => b.id),
     label: "💔 Davranış",
   },
+  compat: {
+    comp: "CompatibilityVideo",
+    key: "compatId",
+    category: "compat",
+    ids: ZODIAC_COMPATIBILITY.map((c) => c.id),
+    label: "💞 Uyum",
+  },
 };
 
 export type SelectedVideo = {
@@ -117,6 +126,7 @@ const POOL_ORDER: PoolKey[] = [
   "zodiac",
   "ranking",
   "behavior",
+  "compat",
   "numerology",
   "angel",
   "manifest",
@@ -130,6 +140,7 @@ const POOL_WEIGHTS: Record<PoolKey, number> = {
   zodiac: 2,
   ranking: 2,
   behavior: 2,
+  compat: 2,
   numerology: 1,
   angel: 1,
   manifest: 1,

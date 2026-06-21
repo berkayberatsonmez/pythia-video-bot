@@ -17,6 +17,7 @@ import { getZodiacById } from "../src/data/zodiac-signs";
 import { getManifestById } from "../src/data/manifestation";
 import { getRankingById } from "../src/data/zodiac-rankings";
 import { getBehaviorById } from "../src/data/zodiac-behaviors";
+import { getCompatibilityById } from "../src/data/zodiac-compatibility";
 
 export type VideoMeta = {
   title: string;
@@ -368,6 +369,44 @@ function behaviorMeta(id: string): VideoMeta | null {
   };
 }
 
+// ─── COMPAT (viral burç uyumu) ───────────────────────────────────────────
+function compatMeta(id: string): VideoMeta | null {
+  const c = getCompatibilityById(id);
+  if (!c) return null;
+  const n1 = getZodiacById(c.sign1Id)?.signName ?? "";
+  const n2 = getZodiacById(c.sign2Id)?.signName ?? "";
+  const title = clampTitle(`${n1} + ${n2} = ${c.verdict} #shorts`);
+  const desc = [
+    `${n1} + ${n2} uyumlu mu? 👀`,
+    "",
+    `Sonuç: ${c.verdict}`,
+    `1️⃣ ${c.beats[0]}`,
+    `2️⃣ ${c.beats[1]}`,
+    `3️⃣ ${c.beats[2]}`,
+    "",
+    `${c.question} 👇 O kişiyi etiketle`,
+    ...PYTHIA_CTA,
+    `#burç #burçuyumu #astroloji #ilişki #zodiac #shorts`,
+    "",
+    DISCLAIMER,
+  ].join("\n");
+  return {
+    title,
+    description: desc,
+    tags: clampTags([
+      "burç",
+      "burç uyumu",
+      "astroloji",
+      "ilişki",
+      "burçlar",
+      "zodiac",
+      "astrology",
+      "Pythia",
+      "shorts",
+    ]),
+  };
+}
+
 // ─── Dispatcher ──────────────────────────────────────────────────────────
 export function buildMetadata(category: string, id: string): VideoMeta {
   let meta: VideoMeta | null = null;
@@ -392,6 +431,9 @@ export function buildMetadata(category: string, id: string): VideoMeta {
       break;
     case "behavior":
       meta = behaviorMeta(id);
+      break;
+    case "compat":
+      meta = compatMeta(id);
       break;
   }
   if (!meta) {
@@ -562,6 +604,25 @@ export function buildInstagramCaption(category: string, id: string): string {
         hashtags: ["#burç", "#astroloji", "#burçlar", "#ilişki", "#pythia"],
       });
     }
+    case "compat": {
+      const c = getCompatibilityById(id);
+      if (!c) break;
+      const n1 = getZodiacById(c.sign1Id)?.signName ?? "";
+      const n2 = getZodiacById(c.sign2Id)?.signName ?? "";
+      return igAssemble({
+        hook: `${n1} + ${n2} = ? 👀 Sonuç: ${c.verdict}`,
+        body: [
+          `1️⃣ ${c.beats[0]}`,
+          `2️⃣ ${c.beats[1]}`,
+          `3️⃣ ${c.beats[2]}`,
+        ],
+        reflection: c.question,
+        save: "Kaydet — birine göstereceksin",
+        share: "O kişiyi yorumlarda etiketle 👇",
+        comment: `${c.question} Etiketle 😏`,
+        hashtags: ["#burç", "#burçuyumu", "#astroloji", "#ilişki", "#pythia"],
+      });
+    }
   }
   throw new Error(`IG caption üretilemedi: ${category}/${id}`);
 }
@@ -593,6 +654,12 @@ export function buildFirstComment(category: string, id: string): string {
       const b = getBehaviorById(id);
       const nm = b ? getZodiacById(b.signId)?.signName ?? "" : "";
       return `${nm ? "Bir " + nm + "'la yaşadın mı?" : "Yaşadın mı?"} 👇 Anlat — herkes okusun 😅`;
+    }
+    case "compat": {
+      const c = getCompatibilityById(id);
+      const n1 = c ? getZodiacById(c.sign1Id)?.signName ?? "" : "";
+      const n2 = c ? getZodiacById(c.sign2Id)?.signName ?? "" : "";
+      return `${n1 && n2 ? n1 + " + " + n2 + " — siz misiniz?" : "Siz uyumlu musunuz?"} 👇 O kişiyi etiketle 😏`;
     }
   }
   return "Yorumun ne? 👇 Her yoruma bakıyorum 🤍";

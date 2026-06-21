@@ -21,6 +21,8 @@ import { RankingVideo } from "./RankingVideo";
 import { ZODIAC_RANKINGS, getRankingById } from "./data/zodiac-rankings";
 import { BehaviorVideo } from "./BehaviorVideo";
 import { ZODIAC_BEHAVIORS, getBehaviorById } from "./data/zodiac-behaviors";
+import { CompatibilityVideo } from "./CompatibilityVideo";
+import { ZODIAC_COMPATIBILITY, getCompatibilityById } from "./data/zodiac-compatibility";
 
 // ─── Wrapper — symbolId → full symbol lookup ────────────────────────────
 const DreamSymbolWrapper: React.FC<{
@@ -83,6 +85,15 @@ const BehaviorWrapper: React.FC<{
 }> = ({ behaviorId, voiceover }) => {
   const behavior = getBehaviorById(behaviorId) ?? ZODIAC_BEHAVIORS[0];
   return <BehaviorVideo behavior={behavior} voiceover={voiceover} />;
+};
+
+// ─── Wrapper — compat id → full uyum lookup ─────────────────────────────
+const CompatibilityWrapper: React.FC<{
+  compatId: string;
+  voiceover?: Voiceover;
+}> = ({ compatId, voiceover }) => {
+  const compat = getCompatibilityById(compatId) ?? ZODIAC_COMPATIBILITY[0];
+  return <CompatibilityVideo compat={compat} voiceover={voiceover} />;
 };
 
 export const RemotionRoot: React.FC = () => {
@@ -201,6 +212,22 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ behaviorId: "akrep-silince" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
+      />
+
+      {/* ═══ UYUM — viral burç çifti ════════════════════════════════ */}
+      <Composition
+        id="CompatibilityVideo"
+        component={CompatibilityWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ compatId: "akrep-boga" }}
         calculateMetadata={({ props }) => ({
           durationInFrames: props.voiceover
             ? voiceoverTotalFrames(props.voiceover, 30)

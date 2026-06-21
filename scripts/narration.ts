@@ -15,6 +15,7 @@ import { getZodiacById } from "../src/data/zodiac-signs";
 import { getManifestById } from "../src/data/manifestation";
 import { getRankingById } from "../src/data/zodiac-rankings";
 import { getBehaviorById } from "../src/data/zodiac-behaviors";
+import { getCompatibilityById } from "../src/data/zodiac-compatibility";
 
 export type Narration = {
   intro: string;
@@ -134,6 +135,19 @@ export function buildNarration(category: string, id: string): Narration | null {
         m2: clean(b.beats[1]),
         m3: clean(b.beats[2]),
         close: clean(`${b.question} ${CLOSE_CTA}`),
+      };
+    }
+    case "compat": {
+      const c = getCompatibilityById(id);
+      if (!c) return null;
+      const n1 = getZodiacById(c.sign1Id)?.signName ?? "";
+      const n2 = getZodiacById(c.sign2Id)?.signName ?? "";
+      return {
+        intro: clean(`${n1} ve ${n2} bir araya gelince ne olur? ${c.verdict}.`),
+        m1: clean(c.beats[0]),
+        m2: clean(c.beats[1]),
+        m3: clean(c.beats[2]),
+        close: clean(`${c.question} ${CLOSE_CTA}`),
       };
     }
     case "number": {
