@@ -16,6 +16,7 @@ import { getNumberById } from "../src/data/numbers";
 import { getZodiacById } from "../src/data/zodiac-signs";
 import { getManifestById } from "../src/data/manifestation";
 import { getRankingById } from "../src/data/zodiac-rankings";
+import { getBehaviorById } from "../src/data/zodiac-behaviors";
 
 export type VideoMeta = {
   title: string;
@@ -331,6 +332,42 @@ function rankingMeta(id: string): VideoMeta | null {
   };
 }
 
+// ─── BEHAVIOR (viral burç davranış senaryosu) ────────────────────────────
+function behaviorMeta(id: string): VideoMeta | null {
+  const b = getBehaviorById(id);
+  if (!b) return null;
+  const nm = getZodiacById(b.signId)?.signName ?? "";
+  const title = clampTitle(`Bir ${nm} ${b.scenario}… 😱 #shorts`);
+  const desc = [
+    `Bir ${nm} ${b.scenario} ne yapar? 👀`,
+    "",
+    `1️⃣ ${b.beats[0]}`,
+    `2️⃣ ${b.beats[1]}`,
+    `3️⃣ ${b.beats[2]}`,
+    "",
+    `${b.question} 👇 Yorumlara yaz`,
+    ...PYTHIA_CTA,
+    `#burç #astroloji #burçlar #ilişki #zodiac #shorts`,
+    "",
+    DISCLAIMER,
+  ].join("\n");
+  return {
+    title,
+    description: desc,
+    tags: clampTags([
+      "burç",
+      "astroloji",
+      "burç davranışları",
+      "burçlar",
+      "ilişki",
+      "zodiac",
+      "astrology",
+      "Pythia",
+      "shorts",
+    ]),
+  };
+}
+
 // ─── Dispatcher ──────────────────────────────────────────────────────────
 export function buildMetadata(category: string, id: string): VideoMeta {
   let meta: VideoMeta | null = null;
@@ -352,6 +389,9 @@ export function buildMetadata(category: string, id: string): VideoMeta {
       break;
     case "ranking":
       meta = rankingMeta(id);
+      break;
+    case "behavior":
+      meta = behaviorMeta(id);
       break;
   }
   if (!meta) {
@@ -504,6 +544,24 @@ export function buildInstagramCaption(category: string, id: string): string {
         hashtags: ["#burç", "#astroloji", "#burçlar", "#burçyorumu", "#pythia"],
       });
     }
+    case "behavior": {
+      const b = getBehaviorById(id);
+      if (!b) break;
+      const nm = getZodiacById(b.signId)?.signName ?? "";
+      return igAssemble({
+        hook: `Bir ${nm} ${b.scenario} ne yapar? 👀`,
+        body: [
+          `1️⃣ ${b.beats[0]}`,
+          `2️⃣ ${b.beats[1]}`,
+          `3️⃣ ${b.beats[2]}`,
+        ],
+        reflection: b.question,
+        save: "Kaydet — aklına biri geldi 👀",
+        share: `Bir ${nm}'a gönder 😏`,
+        comment: `${b.question} Yorumlara yaz`,
+        hashtags: ["#burç", "#astroloji", "#burçlar", "#ilişki", "#pythia"],
+      });
+    }
   }
   throw new Error(`IG caption üretilemedi: ${category}/${id}`);
 }
@@ -527,6 +585,15 @@ export function buildFirstComment(category: string, id: string): string {
     }
     case "manifest":
       return "Şu an neyi manifest ediyorsun? Yorumlara yaz — evren duysun 🌙✨";
+    case "ranking": {
+      const r = getRankingById(id);
+      return `${r ? r.question : "Seninki var mı?"} 👇 Bence sıralama doğru — sence? 🔥`;
+    }
+    case "behavior": {
+      const b = getBehaviorById(id);
+      const nm = b ? getZodiacById(b.signId)?.signName ?? "" : "";
+      return `${nm ? "Bir " + nm + "'la yaşadın mı?" : "Yaşadın mı?"} 👇 Anlat — herkes okusun 😅`;
+    }
   }
   return "Yorumun ne? 👇 Her yoruma bakıyorum 🤍";
 }

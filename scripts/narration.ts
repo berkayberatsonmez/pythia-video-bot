@@ -14,6 +14,7 @@ import { getNumberById } from "../src/data/numbers";
 import { getZodiacById } from "../src/data/zodiac-signs";
 import { getManifestById } from "../src/data/manifestation";
 import { getRankingById } from "../src/data/zodiac-rankings";
+import { getBehaviorById } from "../src/data/zodiac-behaviors";
 
 export type Narration = {
   intro: string;
@@ -121,6 +122,18 @@ export function buildNarration(category: string, id: string): Narration | null {
         m2: clean(`İkinci: ${nm(r.ranks[1].signId)}. ${r.ranks[1].blurb}`),
         m3: clean(`Ve birinci: ${nm(r.ranks[2].signId)}. ${r.ranks[2].blurb}`),
         close: clean(`${r.question} ${CLOSE_CTA}`),
+      };
+    }
+    case "behavior": {
+      const b = getBehaviorById(id);
+      if (!b) return null;
+      const nm = getZodiacById(b.signId)?.signName ?? "";
+      return {
+        intro: clean(`Bir ${nm} ${b.scenario} aslında ne yapar? Üç şey.`),
+        m1: clean(b.beats[0]),
+        m2: clean(b.beats[1]),
+        m3: clean(b.beats[2]),
+        close: clean(`${b.question} ${CLOSE_CTA}`),
       };
     }
     case "number": {

@@ -19,6 +19,8 @@ import { MANIFESTATIONS, getManifestById } from "./data/manifestation";
 import { voiceoverTotalFrames, type Voiceover } from "./components/voiceover";
 import { RankingVideo } from "./RankingVideo";
 import { ZODIAC_RANKINGS, getRankingById } from "./data/zodiac-rankings";
+import { BehaviorVideo } from "./BehaviorVideo";
+import { ZODIAC_BEHAVIORS, getBehaviorById } from "./data/zodiac-behaviors";
 
 // ─── Wrapper — symbolId → full symbol lookup ────────────────────────────
 const DreamSymbolWrapper: React.FC<{
@@ -72,6 +74,15 @@ const RankingWrapper: React.FC<{
 }> = ({ rankingId, voiceover }) => {
   const ranking = getRankingById(rankingId) ?? ZODIAC_RANKINGS[0];
   return <RankingVideo ranking={ranking} voiceover={voiceover} />;
+};
+
+// ─── Wrapper — behavior id → full senaryo lookup ────────────────────────
+const BehaviorWrapper: React.FC<{
+  behaviorId: string;
+  voiceover?: Voiceover;
+}> = ({ behaviorId, voiceover }) => {
+  const behavior = getBehaviorById(behaviorId) ?? ZODIAC_BEHAVIORS[0];
+  return <BehaviorVideo behavior={behavior} voiceover={voiceover} />;
 };
 
 export const RemotionRoot: React.FC = () => {
@@ -174,6 +185,22 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ rankingId: "yalanci" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
+      />
+
+      {/* ═══ DAVRANIŞ — viral burç senaryosu ════════════════════════ */}
+      <Composition
+        id="BehaviorVideo"
+        component={BehaviorWrapper}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ behaviorId: "akrep-silince" }}
         calculateMetadata={({ props }) => ({
           durationInFrames: props.voiceover
             ? voiceoverTotalFrames(props.voiceover, 30)
