@@ -2,9 +2,10 @@
 // narration.ts — Seslendirme metni üreteci (kategori-bilinçli)
 //
 // buildNarration(category, id) → { intro, m1, m2, m3, close } (konuşma metni)
-// metadata.ts'in caption'a yaptığını, KONUŞMA için yapar:
+//   • intro = KANCA (havuzdan id-hash ile seçilir → varyasyon, "şablon" hissi kırılır)
+//   • m1-3 = 3 anlam (ilk cümle), close = soru + CTA
 //   • emoji + satır sonu temizlenir (TTS düzgün okusun)
-//   • intro = kanca, m1-3 = 3 anlam, close = soru + CTA
+// Strateji: ilk 3 sn = #1 kaldıraç → kanca keskin yargı/merak, kurulum yok.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { getSymbolById } from "../src/data/dream-symbols";
@@ -35,13 +36,23 @@ function clean(s: string): string {
 
 const ORD = ["Birincisi", "İkincisi", "Üçüncüsü"];
 // NOT: "Paytia" = TTS'in "Pythia"yı doğru okuması için fonetik yazım (ekranda "Pythia").
-const CLOSE_CTA = "Daha fazlası Paytia'da, profilde ücretsiz dene.";
+const CLOSE_CTA = "Daha fazlası Paytia'da, profildeki linke dokun, ücretsiz indir.";
 
 // Konuşmayı kısa tut → ilk cümle (ekranda tam metin zaten görünüyor)
 function firstSentence(s: string): string {
   const c = clean(s);
   const m = c.match(/^[^.!?]*[.!?]/);
   return (m ? m[0] : c).trim();
+}
+
+// id'den deterministik indeks (kanca havuzu rotasyonu — state'siz, tekrarlanabilir)
+function pickIdx(seed: string, len: number): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return h % len;
+}
+function pick(pool: string[], seed: string): string {
+  return pool[pickIdx(seed, pool.length)];
 }
 
 function fromMeanings(
@@ -63,45 +74,77 @@ export function buildNarration(category: string, id: string): Narration | null {
     case "dream": {
       const s = getSymbolById(id);
       if (!s) return null;
-      return fromMeanings(
-        `Rüyanda ${s.symbolName} gördüysen, bilinçaltın sana bir şey söylüyor.`,
-        s.meanings,
-        `Seninki nasıldı? ${CLOSE_CTA}`,
+      const intro = pick(
+        [
+          `Rüyanda ${s.symbolName} gördüysen, bu bir tesadüf değil.`,
+          `Rüyanda ${s.symbolName} görmek aslında ne anlatıyor? Çoğu kişi yanlış biliyor.`,
+          `Dün gece rüyanda ${s.symbolName} gördüysen, bilinçaltın sana üç şey söylüyor.`,
+        ],
+        id,
       );
+      return fromMeanings(intro, s.meanings, `Seninki nasıldı? ${CLOSE_CTA}`);
     }
     case "tarot": {
       const c = getTarotById(id);
       if (!c) return null;
-      return fromMeanings(
-        `Bugün senin kartın: ${c.cardName}. ${c.energy}.`,
-        c.meanings,
-        `Sen bugün hangi kartı çekiyorsun? ${CLOSE_CTA}`,
+      const intro = pick(
+        [
+          `Bugün kartın ${c.cardName} çıktı. Söyleyeceği şey hoşuna gitmeyebilir.`,
+          `${c.cardName} kartını çektiysen, evren bugün seninle konuşuyor.`,
+          `Bu kart bugün yalan söylemiyor: ${c.cardName}.`,
+        ],
+        id,
       );
+      return fromMeanings(intro, c.meanings, `Sen bugün hangi kartı çekiyorsun? ${CLOSE_CTA}`);
     }
     case "zodiac": {
       const z = getZodiacById(id);
       if (!z) return null;
-      return fromMeanings(
-        `${z.signName} burcuysan, kimsenin bilmediği üç gizli yönün var.`,
-        z.meanings,
-        `${z.questionBody}? ${CLOSE_CTA}`,
+      const intro = pick(
+        [
+          `${z.signName} burcuysan, kimsenin bilmediği üç gizli yönün var.`,
+          `${z.signName} burcu hakkında herkesin yanıldığı üç şey.`,
+          `Bu video karşına çıktıysa tesadüf değil. ${z.signName} burcusun ve bunu bilmen gerek.`,
+        ],
+        id,
       );
+      return fromMeanings(intro, z.meanings, `${z.questionBody}? ${CLOSE_CTA}`);
     }
     case "number": {
       const n = getNumberById(id);
       if (!n) return null;
       const intro =
         n.kind === "lifepath"
-          ? `Yaşam yolu sayın ${n.number} ise, gerçek karakterin bu.`
-          : `Sürekli ${n.number} görüyorsan, bu bir tesadüf değil.`;
+          ? pick(
+              [
+                `Yaşam yolu sayın ${n.number} ise, gerçek karakterin bu.`,
+                `Doğum tarihindeki bu sayı kimseye söylemediğin şeyi biliyor: ${n.number}.`,
+              ],
+              id,
+            )
+          : pick(
+              [
+                `Sürekli ${n.number} görüyorsan, bu bir tesadüf değil.`,
+                `${n.number} sayısı karşına çıkıyorsa, evren sana bir mesaj gönderiyor.`,
+                `Her yerde ${n.number} görüyorsan, videoyu kapatma.`,
+              ],
+              id,
+            );
       return fromMeanings(intro, n.meanings, CLOSE_CTA);
     }
     case "manifest": {
       const m = getManifestById(id);
       if (!m) return null;
       const lines = m.lines;
+      const intro = pick(
+        [
+          `${m.theme} için günlük manifesto. Yüksek sesle tekrar et.`,
+          `Bunu yüksek sesle söyle: ${m.theme} senin olacak.`,
+        ],
+        id,
+      );
       return {
-        intro: clean(`${m.theme} için günlük manifesto. Yüksek sesle tekrar et.`),
+        intro: clean(intro),
         m1: clean(lines[0] ?? ""),
         m2: clean(lines[1] ?? lines[0] ?? ""),
         m3: clean(lines[2] ?? lines[lines.length - 1] ?? ""),

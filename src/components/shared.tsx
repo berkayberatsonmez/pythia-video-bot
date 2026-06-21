@@ -262,6 +262,7 @@ export const LogoCta: React.FC<{ subtitle?: string }> = ({
   const opacity = interpolate(enter, [0, 1], [0, 1]);
   const scale = interpolate(enter, [0, 1], [0.5, 1]);
   const glow = (Math.sin(frame * 0.1) + 1) * 0.5;
+  const bounce = Math.sin(frame * 0.2) * 8; // CTA "indir" oku zıplatma
 
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
@@ -312,16 +313,31 @@ export const LogoCta: React.FC<{ subtitle?: string }> = ({
         </div>
         <div
           style={{
-            fontSize: 28,
-            color: GOLD,
-            marginTop: 30,
-            padding: "12px 32px",
-            border: `2px solid ${GOLD}`,
+            fontSize: 30,
+            fontWeight: 700,
+            color: "#0e0a1f",
+            backgroundColor: GOLD,
+            marginTop: 28,
+            padding: "14px 40px",
             borderRadius: 999,
-            letterSpacing: 3,
+            letterSpacing: 2,
+            boxShadow: `0 0 ${24 + glow * 24}px ${GOLD}`,
           }}
         >
-          ÜCRETSİZ DENE
+          🔮 ÜCRETSİZ İNDİR
+        </div>
+        <div
+          style={{
+            fontSize: 34,
+            color: "#ffffff",
+            marginTop: 22,
+            fontFamily: "Georgia, serif",
+            letterSpacing: 1,
+            transform: `translateY(${bounce}px)`,
+            textShadow: "0 0 20px rgba(168,85,247,0.7)",
+          }}
+        >
+          👇 Profildeki linke dokun
         </div>
       </div>
     </AbsoluteFill>

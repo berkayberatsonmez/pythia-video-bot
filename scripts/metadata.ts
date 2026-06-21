@@ -374,39 +374,39 @@ export function buildInstagramCaption(category: string, id: string): string {
       const s = getSymbolById(id);
       if (!s) break;
       return igAssemble({
-        hook: `Rüyanda ${s.symbolName} gördüysen 🌙 bilinçaltın bunu söylüyor`,
+        hook: `Rüyada ${s.symbolName} görmek ne demek? 🌙 Bilinçaltın söylüyor:`,
         body: meaningsBlock(s.meanings),
         reflection: `${s.questionBody.replace(/\n/g, " ")} — ${s.questionFooter}`,
         save: "Kaydet — sabah hatırla",
         share: "Aynı rüyayı gören birine gönder",
         comment: "Seninki nasıldı? Yorumlara yaz",
-        hashtags: ["#rüyatabiri", "#rüyayorumu", s.hashtag, "#bilinçaltı", "#keşfet"],
+        hashtags: ["#rüyatabiri", "#rüyayorumu", s.hashtag, "#bilinçaltı", "#pythia"],
       });
     }
     case "tarot": {
       const c = getTarotById(id);
       if (!c) break;
       return igAssemble({
-        hook: `Bugün senin kartın: ${c.cardName} 🔮 ${c.energy}`,
+        hook: `${c.cardName} kartı ne anlama gelir? 🔮 Bugün sana diyor ki:`,
         body: meaningsBlock(c.meanings),
         reflection: `${c.questionBody.replace(/\n/g, " ")} — ${c.questionFooter}`,
         save: "Kaydet — günün kartı",
         share: "Bugün kart çekmesi gereken birine gönder",
         comment: "Sen hangi kartı çekiyorsun?",
-        hashtags: ["#tarot", "#tarotfalı", "#günlüktarot", "#fal", "#keşfet"],
+        hashtags: ["#tarot", "#tarotfalı", "#günlükkart", "#kehanet", "#pythia"],
       });
     }
     case "zodiac": {
       const z = getZodiacById(id);
       if (!z) break;
       return igAssemble({
-        hook: `${z.signName} burcuysan 🔮 kimsenin bilmediği 3 gizli yönün`,
+        hook: `${z.signName} burcu özellikleri 🔮 Kimsenin bilmediği 3 gizli yön:`,
         body: meaningsBlock(z.meanings),
         reflection: `${z.questionBody.replace(/\n/g, " ")} — ${z.questionFooter}`,
         save: "Kaydet — sonra oku",
         share: `Bir ${z.signName} burcuna gönder`,
         comment: `${z.signName} olan var mı? Yorumlara yaz`,
-        hashtags: ["#burç", z.hashtag, "#astroloji", "#burçyorumu", "#keşfet"],
+        hashtags: ["#burç", "#astroloji", "#günlükburç", z.hashtag, "#pythia"],
       });
     }
     case "number": {
@@ -414,36 +414,36 @@ export function buildInstagramCaption(category: string, id: string): string {
       if (!n) break;
       if (n.kind === "lifepath") {
         return igAssemble({
-          hook: `Yaşam yolu sayın ${n.number} ise 🔢 gerçek karakterin bu`,
+          hook: `Yaşam yolu ${n.number} kimdir? 🔢 Gerçek karakterin:`,
           body: meaningsBlock(n.meanings),
           reflection: `${n.questionBody.replace(/\n/g, " ")} — ${n.questionFooter}`,
           save: "Kaydet — kendini tanı",
           share: `Yaşam yolu ${n.number} olan birine gönder`,
           comment: "Senin yaşam yolu sayın kaç?",
-          hashtags: ["#numeroloji", "#yaşamyolu", "#astroloji", "#mistik", "#keşfet"],
+          hashtags: ["#numeroloji", "#yaşamyolu", "#ruhsalfarkındalık", "#mistik", "#pythia"],
         });
       }
       return igAssemble({
-        hook: `Sürekli ${n.number} mı görüyorsun? 👁️ Tesadüf değil`,
+        hook: `Sürekli ${n.number} görmek ne demek? 👁️ Melek sayısı ${n.number}:`,
         body: meaningsBlock(n.meanings),
         reflection: `${n.questionBody.replace(/\n/g, " ")} — ${n.questionFooter}`,
         save: "Kaydet — işaret bu",
         share: `Sürekli ${n.number} gören birine gönder`,
         comment: "Sen hangi sayıyı görüyorsun?",
-        hashtags: ["#melekSayıları", `#${n.number}`, "#manifest", "#spiritüel", "#keşfet"],
+        hashtags: ["#meleksayıları", "#numeroloji", `#${n.number}`, "#ruhsalfarkındalık", "#pythia"],
       });
     }
     case "manifest": {
       const m = getManifestById(id);
       if (!m) break;
       return igAssemble({
-        hook: `${m.theme} için günlük manifesto 🌙 yüksek sesle oku`,
+        hook: `${m.theme} manifestosu 🌙 Yüksek sesle oku:`,
         body: m.lines.map((l) => `✨ ${l}`),
         reflection: "Yüksek sesle söyle — niyetini gerçeğe çağır.",
         save: "Kaydet — her gün oku",
         share: "Bunu duyması gereken birine gönder",
         comment: "Sen neyi manifest ediyorsun?",
-        hashtags: ["#manifest", "#olumlama", "#çekimyasası", "#spiritüel", "#keşfet"],
+        hashtags: ["#manifest", "#olumlama", "#çekimyasası", "#spiritüel", "#pythia"],
       });
     }
   }
