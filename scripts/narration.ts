@@ -13,6 +13,7 @@ import { getTarotById } from "../src/data/tarot-cards";
 import { getNumberById } from "../src/data/numbers";
 import { getZodiacById } from "../src/data/zodiac-signs";
 import { getManifestById } from "../src/data/manifestation";
+import { getRankingById } from "../src/data/zodiac-rankings";
 
 export type Narration = {
   intro: string;
@@ -109,6 +110,18 @@ export function buildNarration(category: string, id: string): Narration | null {
         id,
       );
       return fromMeanings(intro, z.meanings, `${z.questionBody}? ${CLOSE_CTA}`);
+    }
+    case "ranking": {
+      const r = getRankingById(id);
+      if (!r) return null;
+      const nm = (sid: string) => getZodiacById(sid)?.signName ?? sid;
+      return {
+        intro: clean(`${r.trait} üç burç. Seninki var mı?`),
+        m1: clean(`Üçüncü sırada: ${nm(r.ranks[0].signId)}. ${r.ranks[0].blurb}`),
+        m2: clean(`İkinci: ${nm(r.ranks[1].signId)}. ${r.ranks[1].blurb}`),
+        m3: clean(`Ve birinci: ${nm(r.ranks[2].signId)}. ${r.ranks[2].blurb}`),
+        close: clean(`${r.question} ${CLOSE_CTA}`),
+      };
     }
     case "number": {
       const n = getNumberById(id);

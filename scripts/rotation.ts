@@ -11,6 +11,7 @@ import { TAROT_CARDS } from "../src/data/tarot-cards";
 import { NUMBERS } from "../src/data/numbers";
 import { ZODIAC_SIGNS } from "../src/data/zodiac-signs";
 import { MANIFESTATIONS } from "../src/data/manifestation";
+import { ZODIAC_RANKINGS } from "../src/data/zodiac-rankings";
 
 export type PoolKey =
   | "dream"
@@ -18,7 +19,8 @@ export type PoolKey =
   | "numerology"
   | "angel"
   | "zodiac"
-  | "manifest";
+  | "manifest"
+  | "ranking";
 
 type Pool = {
   comp: string;
@@ -78,6 +80,13 @@ export const POOLS: Record<PoolKey, Pool> = {
     ids: MANIFESTATIONS.map((m) => m.id),
     label: "🌕 Manifesto",
   },
+  ranking: {
+    comp: "RankingVideo",
+    key: "rankingId",
+    category: "ranking",
+    ids: ZODIAC_RANKINGS.map((r) => r.id),
+    label: "🏆 Sıralama",
+  },
 };
 
 export type SelectedVideo = {
@@ -97,6 +106,7 @@ const POOL_ORDER: PoolKey[] = [
   "dream",
   "tarot",
   "zodiac",
+  "ranking",
   "numerology",
   "angel",
   "manifest",
@@ -108,6 +118,7 @@ const POOL_WEIGHTS: Record<PoolKey, number> = {
   dream: 2,
   tarot: 2,
   zodiac: 2,
+  ranking: 2,
   numerology: 1,
   angel: 1,
   manifest: 1,

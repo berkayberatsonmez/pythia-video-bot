@@ -15,6 +15,7 @@ import { getTarotById } from "../src/data/tarot-cards";
 import { getNumberById } from "../src/data/numbers";
 import { getZodiacById } from "../src/data/zodiac-signs";
 import { getManifestById } from "../src/data/manifestation";
+import { getRankingById } from "../src/data/zodiac-rankings";
 
 export type VideoMeta = {
   title: string;
@@ -294,6 +295,42 @@ function manifestMeta(id: string): VideoMeta | null {
   };
 }
 
+// ─── RANKING (viral top-3 burç sıralaması) ───────────────────────────────
+function rankingMeta(id: string): VideoMeta | null {
+  const r = getRankingById(id);
+  if (!r) return null;
+  const nm = (sid: string) => getZodiacById(sid)?.signName ?? sid;
+  const title = clampTitle(`${r.trait} 3 Burç 🔮 Seninki Var mı? #shorts`);
+  const desc = [
+    `${r.trait} 3 burç 🔮`,
+    "",
+    `🥉 3. ${nm(r.ranks[0].signId)} — ${r.ranks[0].blurb}`,
+    `🥈 2. ${nm(r.ranks[1].signId)} — ${r.ranks[1].blurb}`,
+    `🥇 1. ${nm(r.ranks[2].signId)} — ${r.ranks[2].blurb}`,
+    "",
+    `${r.question} 👇 Yorumlara yaz`,
+    ...PYTHIA_CTA,
+    `#burç #astroloji #burçlar #burçyorumu #zodiac #shorts`,
+    "",
+    DISCLAIMER,
+  ].join("\n");
+  return {
+    title,
+    description: desc,
+    tags: clampTags([
+      "burç",
+      "astroloji",
+      "burç sıralaması",
+      "burçlar",
+      "günlük burç",
+      "zodiac",
+      "astrology",
+      "Pythia",
+      "shorts",
+    ]),
+  };
+}
+
 // ─── Dispatcher ──────────────────────────────────────────────────────────
 export function buildMetadata(category: string, id: string): VideoMeta {
   let meta: VideoMeta | null = null;
@@ -312,6 +349,9 @@ export function buildMetadata(category: string, id: string): VideoMeta {
       break;
     case "manifest":
       meta = manifestMeta(id);
+      break;
+    case "ranking":
+      meta = rankingMeta(id);
       break;
   }
   if (!meta) {
@@ -444,6 +484,24 @@ export function buildInstagramCaption(category: string, id: string): string {
         share: "Bunu duyması gereken birine gönder",
         comment: "Sen neyi manifest ediyorsun?",
         hashtags: ["#manifest", "#olumlama", "#çekimyasası", "#spiritüel", "#pythia"],
+      });
+    }
+    case "ranking": {
+      const r = getRankingById(id);
+      if (!r) break;
+      const nm = (sid: string) => getZodiacById(sid)?.signName ?? sid;
+      return igAssemble({
+        hook: `${r.trait} 3 burç 🔮 Seninki var mı?`,
+        body: [
+          `🥉 3. ${nm(r.ranks[0].signId)} — ${r.ranks[0].blurb}`,
+          `🥈 2. ${nm(r.ranks[1].signId)} — ${r.ranks[1].blurb}`,
+          `🥇 1. ${nm(r.ranks[2].signId)} — ${r.ranks[2].blurb}`,
+        ],
+        reflection: r.question,
+        save: "Kaydet — arkadaşına göster",
+        share: "Bu listede olan birine gönder",
+        comment: `${r.question} Yorumlara yaz`,
+        hashtags: ["#burç", "#astroloji", "#burçlar", "#burçyorumu", "#pythia"],
       });
     }
   }

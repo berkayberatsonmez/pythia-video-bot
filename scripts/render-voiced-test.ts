@@ -7,8 +7,7 @@ import { buildVoiceover } from "./voiceover-build";
 
 type T = { category: string; id: string; comp: string; propKey: string };
 const TESTS: T[] = [
-  { category: "manifest", id: "confidence", comp: "ManifestVideo", propKey: "manifestId" },
-  { category: "dream", id: "snake", comp: "DreamSymbolVideo", propKey: "symbolId" },
+  { category: "ranking", id: "yalanci", comp: "RankingVideo", propKey: "rankingId" },
 ];
 
 async function one(t: T): Promise<void> {
