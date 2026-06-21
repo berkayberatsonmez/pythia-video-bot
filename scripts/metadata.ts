@@ -260,11 +260,13 @@ function zodiacMeta(id: string): VideoMeta | null {
 function manifestMeta(id: string): VideoMeta | null {
   const m = getManifestById(id);
   if (!m) return null;
+  const t = m.theme.charAt(0) + m.theme.slice(1).toLocaleLowerCase("tr");
+  const themeTag = "#" + m.theme.toLocaleLowerCase("tr").replace(/\s+/g, "");
   const title = clampTitle(
-    `${m.theme} İçin Günlük Manifesto 🌙 Yüksek Sesle Oku #shorts`,
+    `${t} İstiyorsan Bunu Her Sabah Oku 🌙 Manifesto #shorts`,
   );
   const desc = [
-    `${m.prompt.toLowerCase()} — ${m.theme} manifestosu 🌙`,
+    `${t} istiyorsan bunu her sabah yüksek sesle oku 🌙`,
     "",
     ...m.lines.map((l) => `✨ ${l}`),
     "",
@@ -273,7 +275,7 @@ function manifestMeta(id: string): VideoMeta | null {
     "",
     "Sen neyi manifest ediyorsun? 👇 Yorumlara yaz 🌙",
     ...PYTHIA_CTA,
-    `#manifesto #olumlama #manifest #çekimyasası #affirmations #shorts`,
+    `${themeTag} #manifesto #olumlama #manifest #çekimyasası #shorts`,
     "",
     DISCLAIMER,
   ].join("\n");
@@ -558,14 +560,16 @@ export function buildInstagramCaption(category: string, id: string): string {
     case "manifest": {
       const m = getManifestById(id);
       if (!m) break;
+      const t = m.theme.charAt(0) + m.theme.slice(1).toLocaleLowerCase("tr");
+      const themeTag = "#" + m.theme.toLocaleLowerCase("tr").replace(/\s+/g, "");
       return igAssemble({
-        hook: `${m.theme} manifestosu 🌙 Yüksek sesle oku:`,
+        hook: `${t} istiyorsan bunu yüksek sesle oku 🌙✨`,
         body: m.lines.map((l) => `✨ ${l}`),
-        reflection: "Yüksek sesle söyle — niyetini gerçeğe çağır.",
-        save: "Kaydet — her gün oku",
+        reflection: "Niyetini gerçeğe çağır 🌙",
+        save: "Kaydet — her sabah oku",
         share: "Bunu duyması gereken birine gönder",
-        comment: "Sen neyi manifest ediyorsun?",
-        hashtags: ["#manifest", "#olumlama", "#çekimyasası", "#spiritüel", "#pythia"],
+        comment: 'İnanıyorsan "geliyor" yaz 💫',
+        hashtags: [themeTag, "#manifest", "#olumlama", "#çekimyasası", "#pythia"],
       });
     }
     case "ranking": {

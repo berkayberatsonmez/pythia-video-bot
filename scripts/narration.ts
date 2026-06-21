@@ -178,8 +178,9 @@ export function buildNarration(category: string, id: string): Narration | null {
       const lines = m.lines;
       const intro = pick(
         [
-          `${m.theme} için günlük manifesto. Yüksek sesle tekrar et.`,
-          `Bunu yüksek sesle söyle: ${m.theme} senin olacak.`,
+          `${m.theme} istiyorsan bu üç cümleyi yüksek sesle tekrarla.`,
+          `Bunu yüksek sesle söyle, ${m.theme} senin olacak.`,
+          `Bu video karşına çıktıysa tesadüf değil. ${m.theme} yolda.`,
         ],
         id,
       );
