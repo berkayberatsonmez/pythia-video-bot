@@ -55,6 +55,9 @@ const COVER_OFFSET_MS: Record<string, number> = {
   number: 3800, // büyük sayı + başlık
   zodiac: 3800, // altın glif + burç adı
   manifest: 1800, // tema başlığı
+  behavior: 3800, // reveal: altın glyph + "…ne yapar?" (zodiac ile aynı yapı)
+  compat: 3800, // reveal: verdict — büyük altın yazı ("YA HEP YA HİÇ" vb.)
+  ranking: 1200, // hook: altın "3 BURÇ" (reveal karanlık geri-sayım, o yüzden hook)
 };
 
 // ─── Mükerrer koruması — bu kanca son ~20 saatte paylaşıldı mı? ───────────
