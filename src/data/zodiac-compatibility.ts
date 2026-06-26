@@ -160,6 +160,78 @@ export const ZODIAC_COMPATIBILITY: Compatibility[] = [
     ],
     question: "Güven mi, heyecan mı?",
   },
+  {
+    id: "boga-balik",
+    sign1Id: "taurus",
+    sign2Id: "pisces",
+    verdict: "MASAL GİBİ 🌙",
+    beats: [
+      "Toprak ve su — biri sağlam, diğeri hayalperest.",
+      "Boğa güven verir, Balık romantizmi tavan yapar.",
+      "Boğa onu yere indirir, Balık ona hayal kurdurur.",
+    ],
+    question: "Bu çift yürür mü sence?",
+  },
+  {
+    id: "koc-aslan",
+    sign1Id: "aries",
+    sign2Id: "leo",
+    verdict: "ATEŞ TOPU 🔥",
+    beats: [
+      "İki ateş burcu — tutku ve enerji tavan.",
+      "İkisi de lider, kimse geri adım atmaz.",
+      "Ya destansı bir aşk ya ego savaşı.",
+    ],
+    question: "Bu kadar ateş taşınır mı?",
+  },
+  {
+    id: "aslan-yay",
+    sign1Id: "leo",
+    sign2Id: "sagittarius",
+    verdict: "KIVILCIM 🎆",
+    beats: [
+      "İki ateş burcu — macera ve kahkaha dolu.",
+      "Birbirini asla sıkmaz, hep heyecan ararlar.",
+      "Özgürlük ikisine de şart, bağlanmak zaman alır.",
+    ],
+    question: "Eğlence aşka döner mi?",
+  },
+  {
+    id: "ikizler-terazi",
+    sign1Id: "gemini",
+    sign2Id: "libra",
+    verdict: "ZİHİN İKİZİ 🪶",
+    beats: [
+      "İki hava burcu — sohbetleri hiç bitmez.",
+      "Aynı frekansta düşünür, anında anlaşırlar.",
+      "Hafif ve akıcı ama derinlikten kaçabilirler.",
+    ],
+    question: "En kolay aşk bu mu?",
+  },
+  {
+    id: "akrep-yengec",
+    sign1Id: "scorpio",
+    sign2Id: "cancer",
+    verdict: "TAKINTILI AŞK 🦂",
+    beats: [
+      "İki su burcu — duygular dipsiz kuyu.",
+      "Sadakat ve tutku had safhada.",
+      "Ama kıskançlık ikisini de yiyip bitirebilir.",
+    ],
+    question: "Bu yoğunluk fazla mı?",
+  },
+  {
+    id: "basak-oglak",
+    sign1Id: "virgo",
+    sign2Id: "capricorn",
+    verdict: "SAĞLAM EKİP 🏛️",
+    beats: [
+      "İki toprak burcu — disiplin ve hedef ortak.",
+      "Birlikte plan yapar, geleceği kurarlar.",
+      "Tutkudan çok güven — ama o güven sarsılmaz.",
+    ],
+    question: "Mantık mı, tutku mu kazanır?",
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
