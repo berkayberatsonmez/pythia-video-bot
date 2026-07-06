@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
 
 export const TTS_VOICE = "tr-TR-EmelNeural";
-const RATE = "+12%"; // akıcı/hızlı (kullanıcı tercihi: "voice B")
+const RATE = "+22%"; // snappier — retention (izleyici 4.6sn'de kaçıyordu, tempo artır)
 const PITCH = "+0Hz"; // doğal ton (kalın değil)
 
 /** Metni seslendirip outPath'e mp3 yazar; süreyi (saniye) döndürür. */

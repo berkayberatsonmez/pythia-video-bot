@@ -39,7 +39,7 @@ function clean(s: string): string {
 
 const ORD = ["Birincisi", "İkincisi", "Üçüncüsü"];
 // NOT: "Paytia" = TTS'in "Pythia"yı doğru okuması için fonetik yazım (ekranda "Pythia").
-const CLOSE_CTA = "Daha fazlası Paytia'da, profildeki linke dokun, ücretsiz indir.";
+const CLOSE_CTA = "Devamı Paytia'da, profildeki linkte."; // kısa CTA (retention: sonu uzatma)
 
 // Konuşmayı kısa tut → ilk cümle (ekranda tam metin zaten görünüyor)
 function firstSentence(s: string): string {

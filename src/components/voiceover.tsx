@@ -26,8 +26,8 @@ export type Voiceover = {
   close: VoiceSection;
 };
 
-const GAP = 0.18; // segment arası küçük nefes (saniye)
-const TAIL = 0.9; // sonda kapanış payı (saniye)
+const GAP = 0.12; // segment arası nefes — kısa tut (retention: ölü zaman = kaçış)
+const TAIL = 0.5; // sonda kapanış payı — kısalt (watch% için)
 
 export type Schedule = {
   introFrom: number;
