@@ -7,9 +7,17 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import React from "react";
-import { Audio, Sequence, staticFile, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Audio,
+  interpolate,
+  Sequence,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 
-export type VoiceSection = { src: string; dur: number }; // dur: saniye
+export type VoiceSection = { src: string; dur: number; text?: string }; // dur: saniye · text: altyazı
 export type Voiceover = {
   intro: VoiceSection;
   m1: VoiceSection;
@@ -91,7 +99,58 @@ export function getSegs(vo: Voiceover | undefined, fps: number): Segs {
   };
 }
 
-// 5 seslendirme klibini kendi başlangıçlarına yerleştir
+// ─── Altyazı — voiceover metnini alta göm (segment senkronlu) ──────────────
+// intro/m1/m2/m3 gösterilir. close = CTA (LogoCta görseli) + "Paytia" fonetiği
+// içerdiği için altyazıda YOK. Ekranda "Pythia" doğru yazılsın diye düzeltiyoruz.
+const captionText = (s: string | undefined): string =>
+  (s ?? "").replace(/Paytia/gi, "Pythia").trim();
+
+export const Captions: React.FC<{ vo: Voiceover }> = ({ vo }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const s = buildSchedule(vo, fps);
+  const spans = [
+    { from: s.introFrom, to: s.m1From, text: captionText(vo.intro.text) },
+    { from: s.m1From, to: s.m2From, text: captionText(vo.m1.text) },
+    { from: s.m2From, to: s.m3From, text: captionText(vo.m2.text) },
+    { from: s.m3From, to: s.closeFrom, text: captionText(vo.m3.text) },
+  ];
+  const cur = spans.find((sp) => frame >= sp.from && frame < sp.to);
+  if (!cur || !cur.text) return null;
+  const opacity = interpolate(frame - cur.from, [0, 0.22 * fps], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+  return (
+    <AbsoluteFill
+      style={{
+        justifyContent: "flex-end",
+        alignItems: "center",
+        padding: "0 70px 340px",
+      }}
+    >
+      <div
+        style={{
+          opacity,
+          maxWidth: 940,
+          textAlign: "center",
+          fontFamily: "Georgia, serif",
+          fontWeight: 700,
+          fontSize: 40,
+          lineHeight: 1.32,
+          color: "#ffffff",
+          background: "rgba(10,6,26,0.74)",
+          borderRadius: 22,
+          padding: "16px 30px",
+          textShadow: "0 2px 14px rgba(0,0,0,0.85)",
+        }}
+      >
+        {cur.text}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// 5 seslendirme klibi + senkron altyazı (VoiceTrack tüm kompozisyonlarda var)
 export const VoiceTrack: React.FC<{ vo: Voiceover }> = ({ vo }) => {
   const { fps } = useVideoConfig();
   const schedule = buildSchedule(vo, fps);
@@ -114,6 +173,7 @@ export const VoiceTrack: React.FC<{ vo: Voiceover }> = ({ vo }) => {
           <Audio src={staticFile(it.sec.src)} />
         </Sequence>
       ))}
+      <Captions vo={vo} />
     </>
   );
 };

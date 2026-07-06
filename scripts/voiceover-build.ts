@@ -25,7 +25,7 @@ export async function buildVoiceover(
   for (const key of KEYS) {
     const rel = `voiceover/${slug}/${key}.mp3`;
     const dur = await synth(n[key], join("public", rel));
-    out[key] = { src: rel, dur };
+    out[key] = { src: rel, dur, text: n[key] };
   }
   return out;
 }
