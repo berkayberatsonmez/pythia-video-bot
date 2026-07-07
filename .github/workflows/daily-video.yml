@@ -1,6 +1,6 @@
 name: Pythia Günlük Video
 
-# 3 zamanlı cron (UTC): 03:41 YouTube yükle (YT 13:00/20:00 TR'ye zamanlı yayınlar),
+# 3 zamanlı cron (UTC): 03:41 YouTube yükle (1 video/gün — sabah slot, 13:00 TR zamanlı; retention için az/kaliteli),
 # 10:07 Instagram sabah Reels, 18:07 Instagram akşam Reels. (TR = UTC+3, DST yok)
 # TikTok: IG slotlarıyla birlikte drafts'a yüklenir — telefondan tek tıkla yayınla (TikTok video.upload kuralı).
 on:
@@ -8,7 +8,7 @@ on:
     # GitHub cron'u bu repoda ~4-5 saat gecikiyor (garip dakika bile çözmedi).
     # IG için DAKİK zamanlama: cron-job.org → repository_dispatch (aşağıda).
     # Aşağıdaki cron'lar YEDEK — geç de olsa atsınlar; dedup mükerreri engeller.
-    - cron: "41 3 * * *" # YouTube (gecikme tolere eder — server-side 13:00/20:00 yayınlar)
+    - cron: "41 3 * * *" # YouTube (1 video/gün, sabah slot — server-side 13:00 yayınlar)
     - cron: "7 10 * * *" # IG sabah (yedek)
     - cron: "7 18 * * *" # IG akşam (yedek)
   repository_dispatch: # cron-job.org dış tetiği — DAKİK IG zamanlaması (asıl yol)
@@ -88,7 +88,7 @@ jobs:
             SCHED="${{ github.event.schedule }}"
             echo "▶ Zamanlı (GitHub cron, yedek): $SCHED"
             case "$SCHED" in
-              "41 3 * * *") npm run rotation -- --upload ;;
+              "41 3 * * *") npm run rotation -- --upload --slot morning ;; # YT 1/gün (retention)
               "7 10 * * *") npm run rotation -- --instagram --tiktok --slot morning ;;
               "7 18 * * *") npm run rotation -- --instagram --tiktok --slot evening ;;
               *)            echo "⚠️ Bilinmeyen schedule ($SCHED) — atlanıyor" ;;
@@ -98,7 +98,7 @@ jobs:
             echo "▶ Manuel: $MODE"
             case "$MODE" in
               instagram)   npm run rotation -- --instagram --tiktok ;;
-              youtube)     npm run rotation -- --upload ;;
+              youtube)     npm run rotation -- --upload --slot morning ;; # YT 1/gün
               tiktok)      npm run rotation -- --tiktok --slot morning ;; # SADECE TikTok drafts (IG/YT yok) — test/manuel
               commenttest) npx tsx scripts/upload-instagram.ts --comment-test ;;
               *)           npm run rotation -- --upload --instagram --tiktok ;;
