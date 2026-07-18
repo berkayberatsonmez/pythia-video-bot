@@ -1,222 +1,209 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// rotation.ts — Stateless çok-kategorili rotasyon (CI uyumlu)
+// rotation.ts — Hangi gün hangi format(lar) yayınlanır (stateless, deterministik)
 //
-// Tarih-tabanlı deterministik: state dosyası YOK → GitHub Actions'ta
-// her çalışma aynı/doğru sonucu verir. Round-robin ile kategoriler
-// karışık dizilir (peş peşe aynı kategori gelmez).
+// Sabah slotu = DailyChallenge HER GÜN (oyunla senkron — herkese aynı bulmaca).
+// Akşam slotu = kalan 5 format arasında GÜN-ENDEKSLİ rotasyon (art arda aynı
+// format gelmez — döngüsel). Formatlar mevcut GameReplay/GameScene motoru üstünde.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { DREAM_SYMBOLS } from "../src/data/dream-symbols";
-import { TAROT_CARDS } from "../src/data/tarot-cards";
-import { NUMBERS } from "../src/data/numbers";
-import { ZODIAC_SIGNS } from "../src/data/zodiac-signs";
-import { MANIFESTATIONS } from "../src/data/manifestation";
-import { ZODIAC_RANKINGS } from "../src/data/zodiac-rankings";
-import { ZODIAC_BEHAVIORS } from "../src/data/zodiac-behaviors";
-import { ZODIAC_COMPATIBILITY } from "../src/data/zodiac-compatibility";
+import { simulate } from "../src/game/botSim";
+import { forLevel } from "../src/game/levelConfig";
+import { dailyConfig, todaysSeed } from "../src/game/dailyConfig";
 
-export type PoolKey =
-  | "dream"
-  | "tarot"
-  | "numerology"
-  | "angel"
-  | "zodiac"
-  | "manifest"
-  | "ranking"
-  | "behavior"
-  | "compat";
-
-type Pool = {
-  comp: string;
-  key: string; // props key
-  category: string; // render-one kategori adı
-  ids: string[];
-  label: string;
-};
-
-// Rüya sembollerini arama hacmine göre sırala (yüksek önce) → en çok aranan
-// içerik ("rüyada yılan/diş görmek" gibi) önce ve daha sık paylaşılsın.
-const SEARCH_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
-const DREAM_IDS_BY_SEARCH = [...DREAM_SYMBOLS]
-  .sort((a, b) => SEARCH_RANK[a.searchVolume] - SEARCH_RANK[b.searchVolume])
-  .map((s) => s.id);
-
-export const POOLS: Record<PoolKey, Pool> = {
-  dream: {
-    comp: "DreamSymbolVideo",
-    key: "symbolId",
-    category: "dream",
-    ids: DREAM_IDS_BY_SEARCH,
-    label: "🌙 Rüya",
-  },
-  tarot: {
-    comp: "TarotVideo",
-    key: "cardId",
-    category: "tarot",
-    ids: TAROT_CARDS.map((c) => c.id),
-    label: "🃏 Tarot",
-  },
-  numerology: {
-    comp: "NumberVideo",
-    key: "numberId",
-    category: "number",
-    ids: NUMBERS.filter((n) => n.kind === "lifepath").map((n) => n.id),
-    label: "🔢 Numeroloji",
-  },
-  angel: {
-    comp: "NumberVideo",
-    key: "numberId",
-    category: "number",
-    ids: NUMBERS.filter((n) => n.kind === "angel").map((n) => n.id),
-    label: "✨ Melek Sayısı",
-  },
-  zodiac: {
-    comp: "ZodiacVideo",
-    key: "signId",
-    category: "zodiac",
-    ids: ZODIAC_SIGNS.map((z) => z.id),
-    label: "⭐ Burç",
-  },
-  manifest: {
-    comp: "ManifestVideo",
-    key: "manifestId",
-    category: "manifest",
-    ids: MANIFESTATIONS.map((m) => m.id),
-    label: "🌕 Manifesto",
-  },
-  ranking: {
-    comp: "RankingVideo",
-    key: "rankingId",
-    category: "ranking",
-    ids: ZODIAC_RANKINGS.map((r) => r.id),
-    label: "🏆 Sıralama",
-  },
-  behavior: {
-    comp: "BehaviorVideo",
-    key: "behaviorId",
-    category: "behavior",
-    ids: ZODIAC_BEHAVIORS.map((b) => b.id),
-    label: "💔 Davranış",
-  },
-  compat: {
-    comp: "CompatibilityVideo",
-    key: "compatId",
-    category: "compat",
-    ids: ZODIAC_COMPATIBILITY.map((c) => c.id),
-    label: "💞 Uyum",
-  },
-};
+export type VideoFormat =
+  | "daily"
+  | "showcase"
+  | "seal"
+  | "speedclimb"
+  | "failbait"
+  | "boostersave"
+  | "asmr";
 
 export type SelectedVideo = {
   slot: "morning" | "evening";
-  poolKey: PoolKey;
-  label: string;
-  comp: string;
-  category: string;
-  propKey: string;
+  format: VideoFormat;
+  comp: "GameReplay" | "SealCompilation" | "SpeedClimb" | "FailBait";
   id: string;
+  category: string; // metadata dispatch = format
+  label: string;
+  hook: string;
+  finishSec?: number;
+  props: Record<string, unknown>;
 };
 
-// ─── Round-robin master sequence ─────────────────────────────────────────
-// Her pooldan sırayla birer eleman al → kategoriler karışır.
-// Pool bitince atla. Sonuç: 75 videoluk karışık, deterministik dizi.
-const POOL_ORDER: PoolKey[] = [
-  "dream",
-  "tarot",
-  "zodiac",
-  "ranking",
-  "behavior",
-  "compat",
-  "numerology",
-  "angel",
-  "manifest",
+function mmss(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// Gün endeksi (epoch'tan bu yana gün) — akşam rotasyonu döngüsü için.
+function dayIndex(date: Date): number {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+}
+
+const SHOWCASE_HOOKS = [
+  "Bu seviyeyi geçebilir misin? 📦",
+  "Oddly satisfying paket sıralama 📦",
+  "%1 bu seviyeyi ilk denemede geçiyor 😮‍💨📦",
+  "Bu tempoyu kaldırabilir misin? 📦",
 ];
 
-// İzlenme için ağırlık: popüler/yüksek-aramalı kategoriler daha sık paylaşılır.
-// (Rüya/tarot/burç = en çok aranan mistik konular >> numeroloji/melek/manifest)
-const POOL_WEIGHTS: Record<PoolKey, number> = {
-  dream: 2,
-  tarot: 2,
-  zodiac: 2,
-  ranking: 2,
-  behavior: 2,
-  compat: 2,
-  numerology: 1,
-  angel: 1,
-  manifest: 1,
-};
+const showcaseLevel = (seed: number) => 12 + (seed % 19); // L12..L30
 
-// Ağırlıklı round-robin: her turda her pooldan WEIGHT kadar eleman al →
-// popülerler daha sık çıkar ama hepsi sırayla, tekrarsız. Deterministik.
-function buildSequence(): SelectedVideo[] {
-  const seq: SelectedVideo[] = [];
-  const cursor: Record<string, number> = {};
-  for (const k of POOL_ORDER) cursor[k] = 0;
-  const total = POOL_ORDER.reduce((s, k) => s + POOLS[k].ids.length, 0);
-  while (seq.length < total) {
-    for (const k of POOL_ORDER) {
-      const pool = POOLS[k];
-      for (let w = 0; w < POOL_WEIGHTS[k]; w++) {
-        if (cursor[k] < pool.ids.length) {
-          seq.push({
-            slot: "morning", // slot sonradan atanır
-            poolKey: k,
-            label: pool.label,
-            comp: pool.comp,
-            category: pool.category,
-            propKey: pool.key,
-            id: pool.ids[cursor[k]],
-          });
-          cursor[k]++;
-        }
-      }
-    }
-  }
-  return seq;
-}
-
-const SEQUENCE = buildSequence();
-
-// Gün numarası — epoch'tan bu yana gün sayısı (UTC)
-function dayNumber(): number {
-  return Math.floor(Date.now() / 86400000);
-}
-
-/**
- * Bugünün 2 videosunu döndürür (sabah + akşam).
- * Tamamen stateless & deterministik — aynı gün her çağrıda aynı sonuç.
- */
-export function getTodaysVideos(): SelectedVideo[] {
-  const day = dayNumber();
-  const len = SEQUENCE.length;
-  const morning = { ...SEQUENCE[(day * 2) % len], slot: "morning" as const };
-  const evening = {
-    ...SEQUENCE[(day * 2 + 1) % len],
-    slot: "evening" as const,
+// ─── Format kurucular ──────────────────────────────────────────────────────
+function buildDaily(seed: number): SelectedVideo {
+  const finishSec = simulate(dailyConfig, seed, "clean").finishTimeSec;
+  const hook = `Bugünün bulmacası — ben ${mmss(finishSec)}'te bitirdim, sen? 📦`;
+  return {
+    slot: "morning",
+    format: "daily",
+    comp: "GameReplay",
+    id: `daily-${seed}`,
+    category: "daily",
+    label: `📦 Günlük (${mmss(finishSec)})`,
+    hook,
+    finishSec,
+    props: { seed, level: 0, mode: "clean", hook, label: "GÜNLÜK", showTimer: true, speed: 1, chrome: "full", showQr: false },
   };
+}
+
+function buildShowcase(seed: number): SelectedVideo {
+  const level = showcaseLevel(seed);
+  const hook = SHOWCASE_HOOKS[seed % SHOWCASE_HOOKS.length];
+  return {
+    slot: "evening",
+    format: "showcase",
+    comp: "GameReplay",
+    id: `showcase-L${level}-${seed}`,
+    category: "showcase",
+    label: `🎮 Seviye ${level} (nearMiss)`,
+    hook,
+    props: { seed: level * 7919, level, mode: "nearMiss", hook, label: `SEVİYE ${level}`, showTimer: false, speed: 1.2, chrome: "full", showQr: false },
+  };
+}
+
+function buildSeal(seed: number): SelectedVideo {
+  const l1 = 8 + (seed % 10);
+  const l2 = 16 + (seed % 12);
+  const parts = [
+    { seed, level: 0, mode: "clean" as const, label: "GÜNLÜK" },
+    { seed: l1 * 7919, level: l1, mode: "clean" as const, label: `SEVİYE ${l1}` },
+    { seed: l2 * 7919, level: l2, mode: "clean" as const, label: `SEVİYE ${l2}` },
+  ];
+  const hook = "Oddly satisfying mühür yağmuru 📦";
+  return {
+    slot: "evening",
+    format: "seal",
+    comp: "SealCompilation",
+    id: `seal-${seed}`,
+    category: "seal",
+    label: "🎞️ Mühür derlemesi",
+    hook,
+    props: { parts, hook, speed: 1.35, showQr: false },
+  };
+}
+
+function buildSpeedClimb(seed: number): SelectedVideo {
+  const hook = "1. seviye kolay dedin... 5.'ye gel 📦";
+  return {
+    slot: "evening",
+    format: "speedclimb",
+    comp: "SpeedClimb",
+    id: `speedclimb-${seed}`,
+    category: "speedclimb",
+    label: "⏫ SpeedClimb L1→L5",
+    hook,
+    props: { levels: [1, 2, 3, 4, 5], hook, speed: 1.4, showQr: false },
+  };
+}
+
+function buildFailBait(seed: number): SelectedVideo {
+  const level = 12 + (seed % 14); // L12..L25 (hızlı, gerilim)
+  const hook = "Bu paketi kurtarabilir miydin? 😱📦";
+  return {
+    slot: "evening",
+    format: "failbait",
+    comp: "FailBait",
+    id: `failbait-L${level}-${seed}`,
+    category: "failbait",
+    label: `😱 FailBait (Seviye ${level})`,
+    hook,
+    props: { seed: level * 7919, level, hook, label: `SEVİYE ${level}`, showQr: false },
+  };
+}
+
+function buildBoosterSave(seed: number): SelectedVideo {
+  const level = 15 + (seed % 11); // L15..L25 (kaos temposu)
+  const hook = "Son saniye kurtarışı ⏳📦";
+  return {
+    slot: "evening",
+    format: "boostersave",
+    comp: "GameReplay",
+    id: `boostersave-L${level}-${seed}`,
+    category: "boostersave",
+    label: `⏳ BoosterSave (Seviye ${level})`,
+    hook,
+    props: { seed: level * 7919, level, mode: "boosterSave", hook, label: `SEVİYE ${level}`, showTimer: false, speed: 1, chrome: "full", showQr: false },
+  };
+}
+
+function buildAsmr(seed: number): SelectedVideo {
+  // L20+ ama 88sn'yi aşmasın — aşarsa seviyeyi küçült.
+  let level = 20 + (seed % 8); // L20..L27
+  while (level > 18 && simulate(forLevel(level), level * 7919, "clean").totalSec > 88) level--;
+  return {
+    slot: "evening",
+    format: "asmr",
+    comp: "GameReplay",
+    id: `asmr-L${level}-${seed}`,
+    category: "asmr",
+    label: `🎧 PerfectRunASMR (Seviye ${level})`,
+    hook: "",
+    props: { seed: level * 7919, level, mode: "clean", hook: "", label: `SEVİYE ${level}`, showTimer: false, speed: 1, chrome: "asmr", showQr: false },
+  };
+}
+
+// Akşam rotasyon havuzu (daily hariç 6 format). Gün-endeksli döngü → art arda tekrar yok.
+const EVENING_POOL: ((seed: number) => SelectedVideo)[] = [
+  buildSeal,
+  buildShowcase,
+  buildSpeedClimb,
+  buildFailBait,
+  buildBoosterSave,
+  buildAsmr,
+];
+
+export function getTodaysVideos(date: Date = new Date()): SelectedVideo[] {
+  const seed = todaysSeed(date);
+  const morning = buildDaily(seed);
+  const eveningBuilder = EVENING_POOL[((dayIndex(date) % EVENING_POOL.length) + EVENING_POOL.length) % EVENING_POOL.length];
+  const evening = eveningBuilder(seed);
   return [morning, evening];
 }
 
-// ─── CLI önizleme ────────────────────────────────────────────────────────
+// ─── CLI önizleme + 14 günlük simülasyon ───────────────────────────────────
 if (process.argv.includes("--preview")) {
   const picks = getTodaysVideos();
-  const stamp = new Date().toLocaleDateString("tr-TR");
-  console.log(`\n📅 ${stamp} — Bugünün videoları:\n`);
+  console.log(`\n📅 ${new Date().toLocaleDateString("tr-TR")} — Bugünün videoları:\n`);
   for (const p of picks) {
-    const slotTime = p.slot === "morning" ? "13:00" : "20:30";
-    console.log(`  ${slotTime}  ${p.label}  →  ${p.id}`);
-    console.log(`         npm run video -- ${p.category} ${p.id}\n`);
+    console.log(`  ${p.slot === "morning" ? "13:00" : "20:00"}  ${p.label}  [${p.comp}]`);
+    console.log(`         hook: ${p.hook || "(yok — ASMR rozeti)"}`);
+    console.log(`         id: ${p.id}\n`);
   }
-  // Diagnostik: ağırlık dağılımı + tekrarsızlık kontrolü
-  const dist: Record<string, number> = {};
-  for (const s of SEQUENCE) dist[s.poolKey] = (dist[s.poolKey] || 0) + 1;
-  const keys = SEQUENCE.map((s) => `${s.category}:${s.id}`);
-  const unique = new Set(keys).size;
-  console.log(`📊 Dağılım:`, dist);
-  console.log(
-    `   Toplam: ${SEQUENCE.length} · Tekil: ${unique} ${unique === SEQUENCE.length ? "(tekrar YOK ✅)" : "(⚠️ TEKRAR VAR!)"}`,
-  );
-  console.log(
-    `   İlk 12 sıra: ${SEQUENCE.slice(0, 12).map((s) => s.poolKey).join(" → ")}\n`,
-  );
+}
+
+if (process.argv.includes("--schedule")) {
+  const days = Number(process.argv[process.argv.indexOf("--schedule") + 1]) || 14;
+  console.log(`\n📆 ${days} günlük rotasyon:\n`);
+  console.log("Gün         Sabah          Akşam");
+  console.log("─".repeat(70));
+  const base = new Date();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const [m, e] = getTodaysVideos(d);
+    const ds = d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", weekday: "short" });
+    console.log(`${ds.padEnd(12)}${m.format.padEnd(15)}${e.format}`);
+  }
+  console.log();
 }

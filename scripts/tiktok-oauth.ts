@@ -13,7 +13,10 @@
 
 import { spawnSync } from "node:child_process";
 
-const REPO = "berkayberatsonmez/pythia-video-bot";
+const REPO =
+  process.env.GITHUB_REPOSITORY ||
+  process.env.GH_REPO ||
+  "berkayberatsonmez/conveyor-video-bot";
 const REDIRECT_URI = "https://berkayberatsonmez.github.io/oauth-callback.html";
 const SCOPES = "user.info.basic,video.upload,video.list";
 const AUTH_BASE = "https://www.tiktok.com/v2/auth/authorize/";
@@ -60,7 +63,7 @@ async function main(): Promise<void> {
 
   // ── 1. AŞAMA: argüman yoksa yetki URL'ini yaz ──
   if (!codeArg) {
-    const state = "pythia_" + Math.random().toString(36).slice(2, 12);
+    const state = "conveyor_" + Math.random().toString(36).slice(2, 12);
     const authUrl =
       `${AUTH_BASE}?client_key=${encodeURIComponent(clientKey)}` +
       `&scope=${encodeURIComponent(SCOPES)}` +
@@ -68,7 +71,7 @@ async function main(): Promise<void> {
       `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
       `&state=${state}`;
     console.log("\n" + "═".repeat(66));
-    console.log("1) Şu URL'yi tarayıcıda AÇ → @pythiamystic ile giriş → Authorize:");
+    console.log("1) Şu URL'yi tarayıcıda AÇ → TikTok hesabınla giriş → Authorize:");
     console.log("─".repeat(66));
     console.log(authUrl);
     console.log("═".repeat(66));

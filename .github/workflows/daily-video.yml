@@ -1,4 +1,4 @@
-name: Pythia Günlük Video
+name: Conveyor Sort Günlük Video
 
 # 3 zamanlı cron (UTC): 03:41 YouTube yükle (1 video/gün — sabah slot, 13:00 TR zamanlı; retention için az/kaliteli),
 # 10:07 Instagram sabah Reels, 18:07 Instagram akşam Reels. (TR = UTC+3, DST yok)
@@ -80,27 +80,27 @@ jobs:
             ACTION="${{ github.event.action }}"
             echo "▶ Dış tetik (dakik): $ACTION"
             case "$ACTION" in
-              ig-morning) npm run rotation -- --instagram --tiktok --slot morning ;;
-              ig-evening) npm run rotation -- --instagram --tiktok --slot evening ;;
+              ig-morning) npx tsx scripts/generate-daily.ts --instagram --tiktok --slot morning ;;
+              ig-evening) npx tsx scripts/generate-daily.ts --instagram --tiktok --slot evening ;;
               *)          echo "⚠️ Bilinmeyen dispatch ($ACTION) — atlanıyor" ;;
             esac
           elif [ "$EVENT" = "schedule" ]; then
             SCHED="${{ github.event.schedule }}"
             echo "▶ Zamanlı (GitHub cron, yedek): $SCHED"
             case "$SCHED" in
-              "41 3 * * *") npm run rotation -- --upload --slot morning ;; # YT 1/gün (retention)
-              "7 10 * * *") npm run rotation -- --instagram --tiktok --slot morning ;;
-              "7 18 * * *") npm run rotation -- --instagram --tiktok --slot evening ;;
+              "41 3 * * *") npx tsx scripts/generate-daily.ts --upload --slot morning ;; # YT 1/gün (retention)
+              "7 10 * * *") npx tsx scripts/generate-daily.ts --instagram --tiktok --slot morning ;;
+              "7 18 * * *") npx tsx scripts/generate-daily.ts --instagram --tiktok --slot evening ;;
               *)            echo "⚠️ Bilinmeyen schedule ($SCHED) — atlanıyor" ;;
             esac
           else
             MODE="${{ github.event.inputs.mode }}"
             echo "▶ Manuel: $MODE"
             case "$MODE" in
-              instagram)   npm run rotation -- --instagram --tiktok ;;
-              youtube)     npm run rotation -- --upload --slot morning ;; # YT 1/gün
-              tiktok)      npm run rotation -- --tiktok --slot morning ;; # SADECE TikTok drafts (IG/YT yok) — test/manuel
+              instagram)   npx tsx scripts/generate-daily.ts --instagram --tiktok ;;
+              youtube)     npx tsx scripts/generate-daily.ts --upload --slot morning ;; # YT 1/gün
+              tiktok)      npx tsx scripts/generate-daily.ts --tiktok --slot morning ;; # SADECE TikTok drafts (IG/YT yok) — test/manuel
               commenttest) npx tsx scripts/upload-instagram.ts --comment-test ;;
-              *)           npm run rotation -- --upload --instagram --tiktok ;;
+              *)           npx tsx scripts/generate-daily.ts --upload --instagram --tiktok ;;
             esac
           fi

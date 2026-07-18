@@ -10,7 +10,7 @@
 // Env: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REFRESH_TOKEN
 //
 // Çalıştırma:
-//   npx tsx scripts/upload-tiktok.ts --video out/v.mp4 --category dream --id snake
+//   npx tsx scripts/upload-tiktok.ts --video out/v.mp4 --category challenge --id level-042
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
@@ -180,7 +180,7 @@ async function main() {
     console.error(
       "❌ Kullanım: --video <path> --category <cat> --id <id>",
     );
-    console.log("   Örn: --video out/v.mp4 --category dream --id snake");
+    console.log("   Örn: --video out/v.mp4 --category challenge --id level-042");
     process.exit(1);
   }
   if (!existsSync(a.video)) {

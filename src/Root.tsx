@@ -1,280 +1,147 @@
 import "./index.css";
 import React from "react";
 import { Composition } from "remotion";
-import { HelloWorld } from "./Composition";
-import { TarotReveal } from "./TarotReveal";
-import { DreamReveal } from "./DreamReveal";
-import { SnakeDream } from "./SnakeDream";
-import { TeethDream } from "./TeethDream";
-import { DreamSymbolVideo } from "./DreamSymbolVideo";
-import { DREAM_SYMBOLS, getSymbolById } from "./data/dream-symbols";
-import { TarotVideo } from "./TarotVideo";
-import { TAROT_CARDS, getTarotById } from "./data/tarot-cards";
-import { NumberVideo } from "./NumberVideo";
-import { NUMBERS, getNumberById } from "./data/numbers";
-import { ZodiacVideo } from "./ZodiacVideo";
-import { ZODIAC_SIGNS, getZodiacById } from "./data/zodiac-signs";
-import { ManifestVideo } from "./ManifestVideo";
-import { MANIFESTATIONS, getManifestById } from "./data/manifestation";
-import { voiceoverTotalFrames, type Voiceover } from "./components/voiceover";
-import { RankingVideo } from "./RankingVideo";
-import { ZODIAC_RANKINGS, getRankingById } from "./data/zodiac-rankings";
-import { BehaviorVideo } from "./BehaviorVideo";
-import { ZODIAC_BEHAVIORS, getBehaviorById } from "./data/zodiac-behaviors";
-import { CompatibilityVideo } from "./CompatibilityVideo";
-import { ZODIAC_COMPATIBILITY, getCompatibilityById } from "./data/zodiac-compatibility";
+import { GameReplay, calcGameReplayMetadata } from "./GameReplay";
+import { SealCompilation, calcSealCompilationMetadata } from "./SealCompilation";
+import { SpeedClimb, calcSpeedClimbMetadata } from "./SpeedClimb";
+import { FailBait, calcFailBaitMetadata } from "./FailBait";
+import { todaysSeed } from "./game/dailyConfig";
 
-// ─── Wrapper — symbolId → full symbol lookup ────────────────────────────
-const DreamSymbolWrapper: React.FC<{
-  symbolId: string;
-  voiceover?: Voiceover;
-}> = ({ symbolId, voiceover }) => {
-  const symbol = getSymbolById(symbolId) ?? DREAM_SYMBOLS[0];
-  return <DreamSymbolVideo symbol={symbol} voiceover={voiceover} />;
-};
+// ═══════════════════════════════════════════════════════════════════════════
+// Conveyor Sort — sentetik oyun tekrarı kompozisyonları (Faz 2)
+//
+// Bot oyunun GERÇEK dizilim üreticisiyle (Dart parite) oynar; kare kare render.
+// Süreler bot çizelgesinden calculateMetadata ile otomatik.
+//
+//   npm run dev                      Studio önizleme
+//   npm run daily                    bugünün formatlarını üret + yükle
+//   npx tsx scripts/verify-determinism.ts   Dart parite testi
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ─── Wrapper — tarot cardId → full card lookup ──────────────────────────
-const TarotWrapper: React.FC<{ cardId: string; voiceover?: Voiceover }> = ({
-  cardId,
-  voiceover,
-}) => {
-  const card = getTarotById(cardId) ?? TAROT_CARDS[0];
-  return <TarotVideo card={card} voiceover={voiceover} />;
-};
-
-// ─── Wrapper — number id → full content lookup ──────────────────────────
-const NumberWrapper: React.FC<{ numberId: string; voiceover?: Voiceover }> = ({
-  numberId,
-  voiceover,
-}) => {
-  const content = getNumberById(numberId) ?? NUMBERS[0];
-  return <NumberVideo content={content} voiceover={voiceover} />;
-};
-
-// ─── Wrapper — zodiac id → full sign lookup ─────────────────────────────
-const ZodiacWrapper: React.FC<{ signId: string; voiceover?: Voiceover }> = ({
-  signId,
-  voiceover,
-}) => {
-  const sign = getZodiacById(signId) ?? ZODIAC_SIGNS[0];
-  return <ZodiacVideo sign={sign} voiceover={voiceover} />;
-};
-
-// ─── Wrapper — manifest id → full content lookup ────────────────────────
-const ManifestWrapper: React.FC<{
-  manifestId: string;
-  voiceover?: Voiceover;
-}> = ({ manifestId, voiceover }) => {
-  const content = getManifestById(manifestId) ?? MANIFESTATIONS[0];
-  return <ManifestVideo content={content} voiceover={voiceover} />;
-};
-
-// ─── Wrapper — ranking id → full sıralama lookup ────────────────────────
-const RankingWrapper: React.FC<{
-  rankingId: string;
-  voiceover?: Voiceover;
-}> = ({ rankingId, voiceover }) => {
-  const ranking = getRankingById(rankingId) ?? ZODIAC_RANKINGS[0];
-  return <RankingVideo ranking={ranking} voiceover={voiceover} />;
-};
-
-// ─── Wrapper — behavior id → full senaryo lookup ────────────────────────
-const BehaviorWrapper: React.FC<{
-  behaviorId: string;
-  voiceover?: Voiceover;
-}> = ({ behaviorId, voiceover }) => {
-  const behavior = getBehaviorById(behaviorId) ?? ZODIAC_BEHAVIORS[0];
-  return <BehaviorVideo behavior={behavior} voiceover={voiceover} />;
-};
-
-// ─── Wrapper — compat id → full uyum lookup ─────────────────────────────
-const CompatibilityWrapper: React.FC<{
-  compatId: string;
-  voiceover?: Voiceover;
-}> = ({ compatId, voiceover }) => {
-  const compat = getCompatibilityById(compatId) ?? ZODIAC_COMPATIBILITY[0];
-  return <CompatibilityVideo compat={compat} voiceover={voiceover} />;
-};
+// Studio önizleme için "bugün" (render'da generate-daily props geçer).
+const previewSeed = todaysSeed();
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      {/* ═══ RÜYA — 10 sembol ═══════════════════════════════════════ */}
-      {/* Render: npx remotion render src/index.ts DreamSymbolVideo \
-                  out/v.mp4 --props='{"symbolId":"snake"}'                */}
+      {/* ═══ GameReplay — DailyChallenge / LevelShowcase ═══════════════ */}
       <Composition
-        id="DreamSymbolVideo"
-        component={DreamSymbolWrapper}
-        durationInFrames={15 * 30}
+        id="GameReplay"
+        component={GameReplay}
+        durationInFrames={40 * 30}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ symbolId: "snake" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
+        defaultProps={{
+          seed: previewSeed,
+          level: 0, // 0 = günlük bulmaca
+          mode: "clean" as const,
+          hook: "Bugünün bulmacası — sen kaç saniyede? 📦",
+          label: "GÜNLÜK",
+          showTimer: true,
+          speed: 1,
+          showQr: false,
+        }}
+        calculateMetadata={calcGameReplayMetadata}
       />
 
-      {/* ═══ TAROT — 22 Major Arcana ════════════════════════════════ */}
-      {/* Render: npx remotion render src/index.ts TarotVideo \
-                  out/v.mp4 --props='{"cardId":"star"}'                   */}
+      {/* ═══ SealCompilation — mühür-yoğun kesitler ═══════════════════ */}
       <Composition
-        id="TarotVideo"
-        component={TarotWrapper}
-        durationInFrames={15 * 30}
+        id="SealCompilation"
+        component={SealCompilation}
+        durationInFrames={20 * 30}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ cardId: "star" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
+        defaultProps={{
+          parts: [
+            { seed: previewSeed, level: 0, mode: "clean" as const, label: "GÜNLÜK" },
+            { seed: previewSeed, level: 18, mode: "clean" as const, label: "SEVİYE 18" },
+            { seed: previewSeed, level: 24, mode: "clean" as const, label: "SEVİYE 24" },
+          ],
+          hook: "Oddly satisfying mühür yağmuru 📦",
+          speed: 1.3,
+          showQr: false,
+        }}
+        calculateMetadata={calcSealCompilationMetadata}
       />
 
-      {/* ═══ NUMEROLOJİ + MELEK SAYILARI — 21 sayı ══════════════════ */}
-      {/* Render: npx remotion render src/index.ts NumberVideo \
-                  out/v.mp4 --props='{"numberId":"a111"}'                 */}
+      {/* ═══ SpeedClimb — L1→L5 hızlı montaj ══════════════════════════ */}
       <Composition
-        id="NumberVideo"
-        component={NumberWrapper}
-        durationInFrames={15 * 30}
+        id="SpeedClimb"
+        component={SpeedClimb}
+        durationInFrames={40 * 30}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ numberId: "a111" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
+        defaultProps={{
+          levels: [1, 2, 3, 4, 5],
+          hook: "1. seviye kolay dedin... 5.'ye gel 📦",
+          speed: 1.4,
+          showQr: false,
+        }}
+        calculateMetadata={calcSpeedClimbMetadata}
       />
 
-      {/* ═══ BURÇ — 12 burç (gizli yüz) ═════════════════════════════ */}
-      {/* Render: npm run video -- zodiac scorpio                       */}
+      {/* ═══ FailBait — tehlike anında dondur + soru ══════════════════ */}
       <Composition
-        id="ZodiacVideo"
-        component={ZodiacWrapper}
-        durationInFrames={15 * 30}
+        id="FailBait"
+        component={FailBait}
+        durationInFrames={30 * 30}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ signId: "scorpio" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
+        defaultProps={{
+          seed: 18 * 7919,
+          level: 18,
+          hook: "Bu paketi kurtarabilir miydin? 😱📦",
+          label: "SEVİYE 18",
+          showQr: false,
+        }}
+        calculateMetadata={calcFailBaitMetadata}
       />
 
-      {/* ═══ MANİFEST — 12 teknik + ay fazları ══════════════════════ */}
-      {/* Render: npm run video -- manifest m369                         */}
+      {/* ═══ BoosterSave / PerfectRunASMR — GameReplay varyantları ═════ */}
+      {/* (rotation.ts comp="GameReplay" + mode/chrome props ile üretir)   */}
       <Composition
-        id="ManifestVideo"
-        component={ManifestWrapper}
-        durationInFrames={15 * 30}
+        id="BoosterSave"
+        component={GameReplay}
+        durationInFrames={60 * 30}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ manifestId: "confidence" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
+        defaultProps={{
+          seed: 20 * 7919,
+          level: 20,
+          mode: "boosterSave" as const,
+          hook: "Son saniye kurtarışı ⏳📦",
+          label: "SEVİYE 20",
+          showTimer: false,
+          speed: 1,
+          chrome: "full" as const,
+          showQr: false,
+        }}
+        calculateMetadata={calcGameReplayMetadata}
       />
-
-      {/* ═══ SIRALAMA — viral Top-3 burç ════════════════════════════ */}
       <Composition
-        id="RankingVideo"
-        component={RankingWrapper}
-        durationInFrames={15 * 30}
+        id="PerfectRunASMR"
+        component={GameReplay}
+        durationInFrames={70 * 30}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ rankingId: "yalanci" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
-      />
-
-      {/* ═══ DAVRANIŞ — viral burç senaryosu ════════════════════════ */}
-      <Composition
-        id="BehaviorVideo"
-        component={BehaviorWrapper}
-        durationInFrames={15 * 30}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={{ behaviorId: "akrep-silince" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
-      />
-
-      {/* ═══ UYUM — viral burç çifti ════════════════════════════════ */}
-      <Composition
-        id="CompatibilityVideo"
-        component={CompatibilityWrapper}
-        durationInFrames={15 * 30}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={{ compatId: "akrep-boga" }}
-        calculateMetadata={({ props }) => ({
-          durationInFrames: props.voiceover
-            ? voiceoverTotalFrames(props.voiceover, 30)
-            : 15 * 30,
-        })}
-      />
-
-      {/* ═══ Eski (specific) compositions — referans için ═══════════ */}
-      <Composition
-        id="TeethDream"
-        component={TeethDream}
-        durationInFrames={15 * 30}
-        fps={30}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="SnakeDream"
-        component={SnakeDream}
-        durationInFrames={15 * 30}
-        fps={30}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="DreamReveal"
-        component={DreamReveal}
-        durationInFrames={15 * 30}
-        fps={30}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="TarotReveal"
-        component={TarotReveal}
-        durationInFrames={15 * 30}
-        fps={30}
-        width={1080}
-        height={1920}
-      />
-      <Composition
-        id="HelloWorld"
-        component={HelloWorld}
-        durationInFrames={90}
-        fps={30}
-        width={1280}
-        height={720}
+        defaultProps={{
+          seed: 22 * 7919,
+          level: 22,
+          mode: "clean" as const,
+          hook: "",
+          label: "SEVİYE 22",
+          showTimer: false,
+          speed: 1,
+          chrome: "asmr" as const,
+          showQr: false,
+        }}
+        calculateMetadata={calcGameReplayMetadata}
       />
     </>
   );

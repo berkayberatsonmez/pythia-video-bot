@@ -1,0 +1,60 @@
+// GEÇİCİ — TS port'u için ground-truth üretir. Video botu doğrulaması sonrası silinir.
+import 'dart:convert';
+import 'dart:math';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:conveyor_sort/game/level_config.dart';
+import 'package:conveyor_sort/game/services/daily_challenge_service.dart';
+import 'package:conveyor_sort/game/sequence_validator.dart';
+
+void main() {
+  test('dump parity ground truth', () {
+    final out = <String, dynamic>{};
+
+    // 1) Dart Random primitive probe — nextInt dizisi
+    final r1 = Random(12345);
+    out['rand_12345_nextInt1000'] =
+        List.generate(20, (_) => r1.nextInt(1000));
+    final r2 = Random(1);
+    out['rand_1_nextInt2'] = List.generate(20, (_) => r2.nextInt(2));
+
+    // 2) List.shuffle primitive probe
+    final l1 = List<int>.generate(10, (i) => i)..shuffle(Random(999));
+    out['shuffle_0to9_seed999'] = l1;
+    final l2 = List<int>.generate(24, (i) => i % 4)..shuffle(Random(20260718));
+    out['shuffle_24mod4_seedDaily'] = l2;
+
+    // 3) Gerçek dizilimler
+    Map<String, dynamic> dump(LevelConfig c, int? seed, String label) {
+      final seq = c.buildSpawnSequence(seed: seed);
+      final sim = simulateSequence(sequence: seq, dockSlots: c.dockSlots);
+      return {
+        'label': label,
+        'seed': seed ?? c.level * 7919,
+        'colorCount': c.colorCount,
+        'targetItems': c.targetItems,
+        'windowTriplets': c.windowTriplets,
+        'effectiveWindowTriplets': c.effectiveWindowTriplets,
+        'maxRun': c.maxRun,
+        'dockSlots': c.dockSlots,
+        'crossTime': c.crossTime,
+        'spawnInterval': c.spawnInterval,
+        'sequence': seq,
+        'sim_lost': sim.lost,
+        'sim_stranded': sim.strandedInDock,
+      };
+    }
+
+    out['daily_20260718'] =
+        dump(DailyChallengeService.dailyConfig, 20260718, 'daily');
+    out['daily_20260719'] =
+        dump(DailyChallengeService.dailyConfig, 20260719, 'daily+1');
+    for (final lvl in [1, 2, 3, 5, 7, 15, 42]) {
+      out['level_$lvl'] = dump(LevelConfig.forLevel(lvl), null, 'L$lvl');
+    }
+
+    // Makine-okunur satır (flutter test log'undan çekmek için tek satır)
+    print('PARITY_JSON_BEGIN');
+    print(jsonEncode(out));
+    print('PARITY_JSON_END');
+  });
+}

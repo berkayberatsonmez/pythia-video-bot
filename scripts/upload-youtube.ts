@@ -187,7 +187,7 @@ async function main() {
     console.error(
       "❌ Kullanım: --video <path> --category <cat> --id <id> [--privacy public|private|unlisted]",
     );
-    console.log("   Örn: --video out/v.mp4 --category tarot --id death");
+    console.log("   Örn: --video out/v.mp4 --category challenge --id level-042");
     process.exit(1);
   }
 

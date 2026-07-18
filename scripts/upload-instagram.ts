@@ -16,7 +16,12 @@ import { buildInstagramCaption, buildFirstComment } from "./metadata";
 
 // graph.instagram.com sürümsüz çalışıyor (Instagram Login API) — deprecation derdi yok
 const IG_BASE = "https://graph.instagram.com";
-const REPO = "berkayberatsonmez/pythia-video-bot";
+// IG video hosting için gh release repo'su. CI'da GITHUB_REPOSITORY otomatik set
+// edilir; yerelde GH_REPO env ile override edilebilir, yoksa varsayılan repo.
+const REPO =
+  process.env.GITHUB_REPOSITORY ||
+  process.env.GH_REPO ||
+  "berkayberatsonmez/conveyor-video-bot";
 
 function token(): string {
   const t = (process.env.IG_ACCESS_TOKEN || "").replace(/^﻿/, "").trim();
@@ -47,18 +52,13 @@ async function igGet(path: string, params: Record<string, string>): Promise<any>
   return json;
 }
 
-// ─── Kapak (cover) — videonun "reveal" anından kare seç (ms cinsinden) ────
+// ─── Kapak (cover) — klip başında hook oturduktan sonraki kareyi seç (ms) ──
 // IG thumb_offset: o milisaniyedeki kare profil grid + Reels sekmesi kapağı olur.
-const COVER_OFFSET_MS: Record<string, number> = {
-  dream: 3800, // sembol ikonu + ismi belirir
-  tarot: 4200, // kart oturur + ismi
-  number: 3800, // büyük sayı + başlık
-  zodiac: 3800, // altın glif + burç adı
-  manifest: 1800, // tema başlığı
-  behavior: 3800, // reveal: altın glyph + "…ne yapar?" (zodiac ile aynı yapı)
-  compat: 3800, // reveal: verdict — büyük altın yazı ("YA HEP YA HİÇ" vb.)
-  ranking: 1200, // hook: altın "3 BURÇ" (reveal karanlık geri-sayım, o yüzden hook)
-};
+// Klip formatı için ~1.2 sn = hook bandı yerine oturmuş + gameplay görünür.
+const DEFAULT_COVER_MS = 1200;
+function coverOffsetMs(_category: string): number {
+  return DEFAULT_COVER_MS;
+}
 
 // ─── Mükerrer koruması — bu kanca son ~20 saatte paylaşıldı mı? ───────────
 // IG'nin kendi son gönderilerini kontrol eder (cron çift-tetik, manuel+zamanlı
@@ -101,7 +101,7 @@ function gh(cmd: string, silent = false): number {
 // ─── Videoyu GitHub Release'e yükle → public URL döndür ───────────────────
 export function uploadToRelease(videoPath: string, tag: string): string {
   // Release yoksa oluştur (zaten varsa "already exists" hatası yutulur)
-  gh(`release create ${tag} --repo ${REPO} --title "Pythia Reels" --notes "Auto IG hosting"`, true);
+  gh(`release create ${tag} --repo ${REPO} --title "Conveyor Sort Reels" --notes "Auto IG hosting"`, true);
   // Asset'i yükle (varsa üzerine yaz)
   const status = gh(`release upload ${tag} "${videoPath}" --clobber --repo ${REPO}`);
   if (status !== 0) {
@@ -182,7 +182,7 @@ export async function postReelFromFile(
 
   const url = uploadToRelease(videoPath, tag);
   console.log(`   🌍 Public URL: ${url}`);
-  const mediaId = await publishReel(url, caption, COVER_OFFSET_MS[category]);
+  const mediaId = await publishReel(url, caption, coverOffsetMs(category));
   // Asset'i SİLMİYORUZ — TikTok'a elle yüklemek için Releases'te kalsın
   console.log(`   💾 TikTok için indir: ${url}`);
 

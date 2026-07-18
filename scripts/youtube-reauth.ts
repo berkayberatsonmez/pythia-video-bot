@@ -15,7 +15,10 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { google } from "googleapis";
 
-const REPO = "berkayberatsonmez/pythia-video-bot";
+const REPO =
+  process.env.GITHUB_REPOSITORY ||
+  process.env.GH_REPO ||
+  "berkayberatsonmez/conveyor-video-bot";
 const SCOPES = ["https://www.googleapis.com/auth/youtube.upload"];
 const CREDS = join(process.cwd(), "scripts", "credentials.json");
 const TOKEN = join(process.cwd(), "scripts", "token.json");
@@ -57,7 +60,7 @@ async function main(): Promise<void> {
       scope: SCOPES,
     });
     console.log("\n" + "═".repeat(66));
-    console.log("1) Şu URL'yi aç → @pythiamystic Google hesabıyla giriş → İzin ver:");
+    console.log("1) Şu URL'yi aç → kanalın Google hesabıyla giriş → İzin ver:");
     console.log("   (Doğrulanmamış uyarısı çıkarsa: 'Gelişmiş → uygulamaya git (güvensiz)')");
     console.log("─".repeat(66));
     console.log(url);
