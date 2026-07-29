@@ -1,0 +1,91 @@
+name: Pythia TikTok Demo (audit)
+
+# ⚠️ MİNİMUM demo hattı — TikTok Direct Post AUDIT submit'ini açmak için TEK
+# private post üretir. Native içerik DEĞİL (o sonraki iş). daily-video.yml'e,
+# IG/YT yoluna DOKUNMAZ — ayrı, bağımsız workflow.
+#
+# Akış: bir kompozisyon render et → out/tiktok/'a paketle (mp4+meta.json+caption.txt)
+#       → Release "pythia-<run>" olarak yayınla. Worker /clips + /publish bunu okur.
+#
+# Secret GEREKMEZ (post etmiyoruz; Direct Post'u Worker paneli yapar). Yalnız
+# gh Release için GITHUB_TOKEN.
+on:
+  workflow_dispatch:
+    inputs:
+      comp:
+        description: "Render edilecek kompozisyon"
+        default: TarotVideo
+      propKey:
+        description: "Props anahtarı (comp'a göre: cardId/signId/symbolId...)"
+        default: cardId
+      category:
+        description: "Kategori (asset adı + caption için)"
+        default: tarot
+      id:
+        description: "İçerik id (asset adı + props değeri)"
+        default: the-tower
+
+permissions:
+  contents: write # gh release
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Chrome bağımlılıkları (Remotion)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 fonts-liberation \
+            fonts-noto-color-emoji
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Remotion tarayıcısını hazırla
+        run: npx remotion browser ensure
+
+      - name: Kompozisyonu render et (MEVCUT hattı, olduğu gibi — voiceover'sız)
+        run: |
+          mkdir -p out/tiktok
+          echo '{ "${{ inputs.propKey }}": "${{ inputs.id }}" }' > props.json
+          npx remotion render src/index.ts "${{ inputs.comp }}" out/tiktok/_raw.mp4 --props=props.json
+
+      - name: Süreyi ölç (ffprobe) + panel asset'lerine paketle
+        id: pack
+        run: |
+          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out/tiktok/_raw.mp4 2>/dev/null | cut -d. -f1)
+          npx tsx scripts/render-tiktok-demo.ts \
+            --in out/tiktok/_raw.mp4 \
+            --category "${{ inputs.category }}" \
+            --id "${{ inputs.id }}" \
+            --duration "${DUR:-0}"
+          rm -f out/tiktok/_raw.mp4
+          echo "tag=pythia-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub Release asset olarak yayınla
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.pack.outputs.tag }}"
+          gh release create "$TAG" out/tiktok/*.mp4 out/tiktok/*.meta.json out/tiktok/*.caption.txt \
+            --title "Pythia TikTok demo #${{ github.run_number }}" \
+            --notes "AUDIT demo — private post için. mp4 + meta.json + caption.txt." \
+          || gh release upload "$TAG" out/tiktok/*.mp4 out/tiktok/*.meta.json out/tiktok/*.caption.txt --clobber
+
+      - name: Artifact olarak da bırak
+        uses: actions/upload-artifact@v4
+        with:
+          name: pythia-tiktok-demo-${{ github.run_number }}
+          path: out/tiktok/*
+          if-no-files-found: error
