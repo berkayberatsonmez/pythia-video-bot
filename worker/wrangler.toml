@@ -13,7 +13,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [[kv_namespaces]]
 binding = "TIKTOK_KV"                         # kod Env.TIKTOK_KV bekler (binding adı AYNI)
-id = "REPLACE_WITH_KV_NAMESPACE_ID"          # wrangler kv namespace create ...
+id = "c6525002e2d34b8491cc9274632a7852"      # wrangler kv namespace create TIKTOK_KV
 
 [vars]
 AUDIT_MODE = "true"                          # audit onayına kadar tüm post SELF_ONLY
