@@ -1,0 +1,25 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# worker/wrangler.toml — Pythia TikTok Direct Post yayın paneli (İSKELET)
+#
+# Conveyor'ın conveyor-tiktok-panel worker'ının Pythia'ya parametrize kopyası.
+# İSKELET: deploy YOK, secret KONMADI. Secret'lar `wrangler secret put` ile:
+#   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, GH_RELEASE_TOKEN
+# KV: `wrangler kv namespace create PYTHIA_TIKTOK_KV` → id buraya.
+# ═══════════════════════════════════════════════════════════════════════════
+name = "pythia-tiktok-panel"                 # ← Conveyor: conveyor-tiktok-panel
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "TIKTOK_KV"                         # kod Env.TIKTOK_KV bekler (binding adı AYNI)
+id = "REPLACE_WITH_KV_NAMESPACE_ID"          # wrangler kv namespace create ...
+
+[vars]
+AUDIT_MODE = "true"                          # audit onayına kadar tüm post SELF_ONLY
+GH_REPO = "berkayberatsonmez/pythia-video-bot"   # ← Conveyor: .../conveyor-video-bot
+REDIRECT_URI = "https://pythia-tiktok-panel.contactruyatabiri.workers.dev/auth/callback"
+
+# Secret'lar (wrangler secret put — repoya YAZILMAZ):
+#   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, GH_RELEASE_TOKEN (fine-grained, contents:read)
+# Pythia'nın KENDİ TikTok app credential'ları (Conveyor'unkinden AYRI olabilir).
