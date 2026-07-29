@@ -21,7 +21,7 @@
 
 import { copyFileSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { buildDemoCaption } from "./tiktok-demo-caption";
+import { buildTikTokMetadata } from "./metadata";
 
 const OUT_DIR = join(process.cwd(), "out", "tiktok");
 
@@ -50,7 +50,7 @@ function main() {
   const metaOut = join(OUT_DIR, `${format}.meta.json`);
   const capOut = join(OUT_DIR, `${format}.caption.txt`);
 
-  const { caption, line1 } = buildDemoCaption(category, id);
+  const { caption, line1 } = buildTikTokMetadata(category, id);
   const durationSec = durationRaw ? Number(durationRaw) : undefined;
 
   copyFileSync(inMp4, mp4Out);

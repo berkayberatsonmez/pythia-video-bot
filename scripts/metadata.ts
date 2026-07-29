@@ -668,3 +668,150 @@ export function buildFirstComment(category: string, id: string): string {
   }
   return "Yorumun ne? 👇 Her yoruma bakıyorum 🤍";
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TIKTOK caption — TikTok-NATIVE (IG'den AYRI kaynak; shadowban-güvenli)
+//
+// buildInstagramCaption / IG_BRAND / buildMetadata / buildFirstComment'e
+// DOKUNMAZ (IG/YT birebir korunur). Kurallar:
+//   • bio-link / URL / "indir·link in bio·google play·app store" YOK · #keşfet YOK
+//   • 3-5 native niş hashtag: kategori sabit seti + kaydın .hashtag'i.
+//     behavior/compat/ranking'de hashtag alanı YOK → o günün burcunun tag'i
+//     getZodiacById(signId) ile eklenir (tekrar sinyalini kırar).
+//   • line1 = DETERMİNİSTİK ilk satır (category+id → aynı girdi aynı çıktı) —
+//     Worker KV dedup anahtarı. RNG yok.
+// render-tiktok-demo.ts + .github/workflows/tiktok-demo.yml bu TEK kaynaktan
+// meta.json (caption+line1) + caption.txt üretir.
+// ═══════════════════════════════════════════════════════════════════════════
+export interface TikTokMeta {
+  caption: string;
+  line1: string; // deterministik dedup anahtarı (= caption ilk satırı)
+}
+
+function ttAssemble(
+  line1: string,
+  teaser: string,
+  question: string,
+  hashtags: (string | undefined)[],
+): TikTokMeta {
+  const oneLine = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();
+  const tags: string[] = [];
+  for (const h of hashtags) {
+    const t = (h ?? "").trim();
+    if (t && !tags.includes(t)) tags.push(t);
+    if (tags.length === 5) break;
+  }
+  const first = oneLine(line1);
+  const caption = [first, oneLine(teaser), oneLine(question), tags.join(" ")]
+    .filter((l) => l.length > 0)
+    .join("\n");
+  return { caption, line1: first };
+}
+
+export function buildTikTokMetadata(category: string, id: string): TikTokMeta {
+  switch (category) {
+    case "dream": {
+      const s = getSymbolById(id);
+      if (s)
+        return ttAssemble(
+          `Rüyada ${s.symbolName} görmek ne demek?`,
+          `Çoğu kişi korkar ama bilinçaltın "${s.meanings[0].title}" diyor.`,
+          "Seninki nasıldı? 👇",
+          ["#rüyatabiri", "#rüya", s.hashtag, "#mistik"],
+        );
+      break;
+    }
+    case "tarot": {
+      const c = getTarotById(id);
+      if (c)
+        return ttAssemble(
+          `Bugünün kartı: ${c.cardName}`,
+          `${c.meanings[0].title} enerjisi bugün seninle.`,
+          "Sana ne söylüyor sence? 👇",
+          ["#tarot", "#tarotfalı", "#günlükkart", c.hashtag],
+        );
+      break;
+    }
+    case "number": {
+      const n = getNumberById(id);
+      if (n && n.kind === "angel")
+        return ttAssemble(
+          `${n.number} sürekli karşına mı çıkıyor?`,
+          `Melekler "${n.title}" mesajını fısıldıyor.`,
+          "Sen de mi görüyorsun? 👇",
+          ["#meleksayıları", "#numeroloji", n.hashtag, "#ruhsalfarkındalık"],
+        );
+      if (n)
+        return ttAssemble(
+          `Yaşam yolu ${n.number}: ${n.title}`,
+          `${n.meanings[0].title} — seni sen yapan şey bu.`,
+          "Senin sayın kaç? 👇",
+          ["#numeroloji", "#yaşamyolu", n.hashtag, "#kişilik"],
+        );
+      break;
+    }
+    case "zodiac": {
+      const z = getZodiacById(id);
+      if (z)
+        return ttAssemble(
+          `${z.signName} burcunun bugünü`,
+          `${z.meanings[0].title}: ${z.meanings[0].desc}`,
+          `Sen ${z.signName} musun? 👇`,
+          ["#burç", "#astroloji", "#burçyorumu", z.hashtag],
+        );
+      break;
+    }
+    case "manifest": {
+      const m = getManifestById(id);
+      if (m)
+        return ttAssemble(
+          `${m.theme} için sabah olumlaması`,
+          m.lines[0],
+          "Bugün senin niyetin ne? 👇",
+          ["#manifestasyon", "#çekimyasası", "#olumlama", m.hashtag],
+        );
+      break;
+    }
+    case "ranking": {
+      const r = getRankingById(id);
+      if (r) {
+        const winner = getZodiacById(r.ranks[2].signId); // ranks = [3.,2.,1.] → [2]=1. sıra
+        return ttAssemble(
+          `${r.trait} burçlar`,
+          "İlk 3'te seninki var mı, tahmin et.",
+          r.question,
+          ["#burç", "#astroloji", "#burçsıralaması", winner?.hashtag],
+        );
+      }
+      break;
+    }
+    case "behavior": {
+      const b = getBehaviorById(id);
+      if (b) {
+        const z = getZodiacById(b.signId);
+        return ttAssemble(
+          `Bir ${z?.signName ?? "burç"} ${b.scenario}`,
+          b.beats[0],
+          b.question,
+          ["#burç", "#astroloji", "#burçyorumu", z?.hashtag],
+        );
+      }
+      break;
+    }
+    case "compat": {
+      const c = getCompatibilityById(id);
+      if (c) {
+        const z1 = getZodiacById(c.sign1Id);
+        const z2 = getZodiacById(c.sign2Id);
+        return ttAssemble(
+          `${z1?.signName ?? "?"} + ${z2?.signName ?? "?"}: ${c.verdict}`,
+          c.beats[0],
+          c.question,
+          ["#burçuyumu", "#astroloji", "#ilişki", z1?.hashtag],
+        );
+      }
+      break;
+    }
+  }
+  throw new Error(`TikTok metadata üretilemedi: ${category}/${id}`);
+}
