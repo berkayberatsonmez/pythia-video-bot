@@ -1,0 +1,107 @@
+name: Pythia TikTok Auto (daily Direct Post)
+
+# TAM-OTOMATİK günlük TikTok Direct Post. Render Actions'ta (Remotion tarayıcı+dakika,
+# Worker'da OLMAZ) → Release'e paketle → Worker /publish'i cron-auth ile çağır.
+# Worker Direct Post'u yapar (privacy AUDIT_MODE'a göre; onaya kadar SELF_ONLY).
+#
+# daily-video.yml'e (IG/YT) ve tiktok-demo.yml'e DOKUNMAZ — ayrı, bağımsız cron.
+#
+# ⚠️ GitHub cron bu repoda gecikebilir (daily-video.yml notu: ~4-5 sa). 1/gün +
+#    audit'te private olduğu için tolere edilir. Audit sonrası DAKİK saat gerekirse
+#    daily-video.yml'deki repository_dispatch (cron-job.org) desenini ekle.
+on:
+  schedule:
+    - cron: "0 9 * * *" # UTC 09:00 = TR 12:00 (öğlen; gece yarısı DEĞİL)
+  workflow_dispatch: {} # elle tetik
+
+permissions:
+  contents: write # gh release
+
+env:
+  WORKER_BASE: "https://pythia-tiktok-panel.contactruyatabiri.workers.dev"
+
+jobs:
+  auto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Chrome bağımlılıkları (Remotion)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+            libxrandr2 libgbm1 libpango-1.0-0 libcairo2 fonts-liberation \
+            fonts-noto-color-emoji
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Remotion tarayıcısını hazırla
+        run: npx remotion browser ensure
+
+      - name: Bugünün klibini seç (rotasyon — deterministik, gün bazlı)
+        id: pick
+        run: |
+          PICK=$(npx tsx scripts/tiktok-pick-today.ts)
+          echo "picked: $PICK"
+          echo "comp=$(echo "$PICK" | jq -r .comp)"         >> "$GITHUB_OUTPUT"
+          echo "propKey=$(echo "$PICK" | jq -r .propKey)"   >> "$GITHUB_OUTPUT"
+          echo "category=$(echo "$PICK" | jq -r .category)" >> "$GITHUB_OUTPUT"
+          echo "id=$(echo "$PICK" | jq -r .id)"             >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y%m%d)"                    >> "$GITHUB_OUTPUT"
+
+      - name: Kompozisyonu render et (MEVCUT hat — voiceover'sız)
+        run: |
+          mkdir -p out/tiktok
+          echo "{ \"${{ steps.pick.outputs.propKey }}\": \"${{ steps.pick.outputs.id }}\" }" > props.json
+          npx remotion render src/index.ts "${{ steps.pick.outputs.comp }}" out/tiktok/_raw.mp4 --props=props.json
+
+      - name: Native caption + panel asset'lerine paketle
+        id: pack
+        run: |
+          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out/tiktok/_raw.mp4 2>/dev/null | cut -d. -f1)
+          npx tsx scripts/render-tiktok-demo.ts \
+            --in out/tiktok/_raw.mp4 \
+            --category "${{ steps.pick.outputs.category }}" \
+            --id "${{ steps.pick.outputs.id }}" \
+            --duration "${DUR:-0}"
+          rm -f out/tiktok/_raw.mp4
+          echo "tag=pythia-auto-${{ steps.pick.outputs.date }}"                 >> "$GITHUB_OUTPUT"
+          echo "format=${{ steps.pick.outputs.category }}-${{ steps.pick.outputs.id }}" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub Release'e yayınla (Worker /publish bunu okur)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.pack.outputs.tag }}"
+          gh release create "$TAG" out/tiktok/*.mp4 out/tiktok/*.meta.json out/tiktok/*.caption.txt \
+            --title "Pythia TikTok auto ${{ steps.pick.outputs.date }}" \
+            --notes "Otomatik günlük Direct Post — Worker /publish çeker." \
+          || gh release upload "$TAG" out/tiktok/*.mp4 out/tiktok/*.meta.json out/tiktok/*.caption.txt --clobber
+
+      - name: Worker /publish çağır (cron-auth; Direct Post'u Worker yapar)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          TAG="${{ steps.pack.outputs.tag }}"
+          FORMAT="${{ steps.pack.outputs.format }}"
+          echo "POST $WORKER_BASE/publish  {tag:$TAG, format:$FORMAT}"
+          HTTP=$(curl -sS -o /tmp/resp.json -w "%{http_code}" -X POST "$WORKER_BASE/publish" \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            -d "{\"tag\":\"$TAG\",\"format\":\"$FORMAT\"}")
+          echo "HTTP $HTTP"; cat /tmp/resp.json; echo
+          # 200 published · 202 processing · 409 duplicate (dedup) → hepsi BAŞARI.
+          # Diğer kodlar → job'ı kırmızıya düşür.
+          case "$HTTP" in
+            200|202|409) echo "✓ ok ($HTTP)";;
+            *) echo "✗ publish başarısız ($HTTP)"; exit 1;;
+          esac

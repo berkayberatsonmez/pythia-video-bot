@@ -32,6 +32,7 @@ export interface Env {
   GH_REPO: string;
   REDIRECT_URI: string;
   EXPECTED_TIKTOK_OPEN_ID?: string; // SET İSE hesap guard'ı; boşsa ilk kurulum (blokla-maz)
+  CRON_SECRET?: string; // SET İSE cron çağrısı X-Cron-Secret ile doğrulanır
 }
 
 const FRONTEND_ORIGIN = "https://berkayberatsonmez.github.io";
@@ -299,6 +300,13 @@ interface PublishBody {
 }
 
 async function publish(req: Request, env: Env): Promise<Response> {
+  // CRON-AUTH: X-Cron-Secret varsa doğrula. Eşleşir → otomatik (cron) çağrı;
+  // yanlış → 403; header YOK → mevcut (panel) davranış (DEĞİŞMEZ).
+  const cronHeader = req.headers.get("X-Cron-Secret");
+  if (cronHeader && (!env.CRON_SECRET || cronHeader !== env.CRON_SECRET)) {
+    throw new HttpError(403, "bad_cron_secret");
+  }
+
   const body = (await req.json().catch(() => ({}))) as PublishBody;
   const tag = body.tag ?? "";
   const format = body.format ?? "";
