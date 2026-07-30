@@ -26,7 +26,7 @@ import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 // Ses-güdümlü (getSegs); sessizde sabit 15sn (Studio). İnanç gerektirmez.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type BehaviorVideoProps = { behavior: Behavior; voiceover?: Voiceover };
+export type BehaviorVideoProps = { behavior: Behavior; voiceover?: Voiceover; tiktokClean?: boolean };
 
 // ─── Altın glyph (CSS mask) — burç sembolü ───────────────────────────────
 const GoldGlyph: React.FC<{ svgFile: string; size: number; glow: number }> = ({
@@ -205,7 +205,7 @@ const BeatCard: React.FC<{ n: number; text: string; durFrames?: number }> = ({
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const BehaviorVideo: React.FC<BehaviorVideoProps> = ({ behavior, voiceover }) => {
+export const BehaviorVideo: React.FC<BehaviorVideoProps> = ({ behavior, voiceover, tiktokClean }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
   const sign = getZodiacById(behavior.signId);
@@ -214,7 +214,7 @@ export const BehaviorVideo: React.FC<BehaviorVideoProps> = ({ behavior, voiceove
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       <Sequence durationInFrames={g.hook.dur} layout="none">
@@ -242,7 +242,7 @@ export const BehaviorVideo: React.FC<BehaviorVideoProps> = ({ behavior, voiceove
       </Sequence>
 
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta subtitle="AI ile kişisel burç yorumu" />
+        {!tiktokClean && <LogoCta subtitle="AI ile kişisel burç yorumu" />}
       </Sequence>
     </AbsoluteFill>
   );

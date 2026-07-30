@@ -26,7 +26,7 @@ import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 // Gerçek kart görseli public/tarot/XX.webp kullanır.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type TarotVideoProps = { card: TarotCard; voiceover?: Voiceover };
+export type TarotVideoProps = { card: TarotCard; voiceover?: Voiceover; tiktokClean?: boolean };
 
 // ─── Hook — "BUGÜN SENİN KARTIN" ─────────────────────────────────────────
 const Hook: React.FC<{ energy: string; durFrames?: number }> = ({
@@ -205,14 +205,14 @@ const CardReveal: React.FC<{ card: TarotCard; durFrames?: number }> = ({
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const TarotVideo: React.FC<TarotVideoProps> = ({ card, voiceover }) => {
+export const TarotVideo: React.FC<TarotVideoProps> = ({ card, voiceover, tiktokClean }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       {/* Hook */}
@@ -252,7 +252,7 @@ export const TarotVideo: React.FC<TarotVideoProps> = ({ card, voiceover }) => {
 
       {/* Logo CTA */}
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta subtitle="AI ile detaylı tarot yorumu" />
+        {!tiktokClean && <LogoCta subtitle="AI ile detaylı tarot yorumu" />}
       </Sequence>
     </AbsoluteFill>
   );

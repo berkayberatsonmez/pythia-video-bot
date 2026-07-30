@@ -26,7 +26,7 @@ import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 // (+ seslendirme + kısık müzik). Yoksa eski sabit 15sn düzen (Studio önizleme).
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ZodiacVideoProps = { sign: ZodiacSign; voiceover?: Voiceover };
+export type ZodiacVideoProps = { sign: ZodiacSign; voiceover?: Voiceover; tiktokClean?: boolean };
 
 // ─── Altın glyph (CSS mask tekniği) ──────────────────────────────────────
 const GoldGlyph: React.FC<{ svgFile: string; size: number; glow: number }> = ({
@@ -211,14 +211,14 @@ const GlyphReveal: React.FC<{ sign: ZodiacSign; durFrames?: number }> = ({
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const ZodiacVideo: React.FC<ZodiacVideoProps> = ({ sign, voiceover }) => {
+export const ZodiacVideo: React.FC<ZodiacVideoProps> = ({ sign, voiceover, tiktokClean }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       <Sequence durationInFrames={g.hook.dur} layout="none">
@@ -251,7 +251,7 @@ export const ZodiacVideo: React.FC<ZodiacVideoProps> = ({ sign, voiceover }) => 
       </Sequence>
 
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta subtitle="AI ile detaylı burç yorumu" />
+        {!tiktokClean && <LogoCta subtitle="AI ile detaylı burç yorumu" />}
       </Sequence>
     </AbsoluteFill>
   );

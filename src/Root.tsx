@@ -28,72 +28,80 @@ import { ZODIAC_COMPATIBILITY, getCompatibilityById } from "./data/zodiac-compat
 const DreamSymbolWrapper: React.FC<{
   symbolId: string;
   voiceover?: Voiceover;
-}> = ({ symbolId, voiceover }) => {
+  tiktokClean?: boolean;
+}> = ({ symbolId, voiceover, tiktokClean }) => {
   const symbol = getSymbolById(symbolId) ?? DREAM_SYMBOLS[0];
-  return <DreamSymbolVideo symbol={symbol} voiceover={voiceover} />;
+  return <DreamSymbolVideo symbol={symbol} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — tarot cardId → full card lookup ──────────────────────────
-const TarotWrapper: React.FC<{ cardId: string; voiceover?: Voiceover }> = ({
-  cardId,
-  voiceover,
-}) => {
+const TarotWrapper: React.FC<{
+  cardId: string;
+  voiceover?: Voiceover;
+  tiktokClean?: boolean;
+}> = ({ cardId, voiceover, tiktokClean }) => {
   const card = getTarotById(cardId) ?? TAROT_CARDS[0];
-  return <TarotVideo card={card} voiceover={voiceover} />;
+  return <TarotVideo card={card} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — number id → full content lookup ──────────────────────────
-const NumberWrapper: React.FC<{ numberId: string; voiceover?: Voiceover }> = ({
-  numberId,
-  voiceover,
-}) => {
+const NumberWrapper: React.FC<{
+  numberId: string;
+  voiceover?: Voiceover;
+  tiktokClean?: boolean;
+}> = ({ numberId, voiceover, tiktokClean }) => {
   const content = getNumberById(numberId) ?? NUMBERS[0];
-  return <NumberVideo content={content} voiceover={voiceover} />;
+  return <NumberVideo content={content} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — zodiac id → full sign lookup ─────────────────────────────
-const ZodiacWrapper: React.FC<{ signId: string; voiceover?: Voiceover }> = ({
-  signId,
-  voiceover,
-}) => {
+const ZodiacWrapper: React.FC<{
+  signId: string;
+  voiceover?: Voiceover;
+  tiktokClean?: boolean;
+}> = ({ signId, voiceover, tiktokClean }) => {
   const sign = getZodiacById(signId) ?? ZODIAC_SIGNS[0];
-  return <ZodiacVideo sign={sign} voiceover={voiceover} />;
+  return <ZodiacVideo sign={sign} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — manifest id → full content lookup ────────────────────────
 const ManifestWrapper: React.FC<{
   manifestId: string;
   voiceover?: Voiceover;
-}> = ({ manifestId, voiceover }) => {
+  tiktokClean?: boolean;
+}> = ({ manifestId, voiceover, tiktokClean }) => {
   const content = getManifestById(manifestId) ?? MANIFESTATIONS[0];
-  return <ManifestVideo content={content} voiceover={voiceover} />;
+  return <ManifestVideo content={content} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — ranking id → full sıralama lookup ────────────────────────
 const RankingWrapper: React.FC<{
   rankingId: string;
   voiceover?: Voiceover;
-}> = ({ rankingId, voiceover }) => {
+  tiktokClean?: boolean;
+}> = ({ rankingId, voiceover, tiktokClean }) => {
   const ranking = getRankingById(rankingId) ?? ZODIAC_RANKINGS[0];
-  return <RankingVideo ranking={ranking} voiceover={voiceover} />;
+  return <RankingVideo ranking={ranking} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — behavior id → full senaryo lookup ────────────────────────
 const BehaviorWrapper: React.FC<{
   behaviorId: string;
   voiceover?: Voiceover;
-}> = ({ behaviorId, voiceover }) => {
+  tiktokClean?: boolean;
+}> = ({ behaviorId, voiceover, tiktokClean }) => {
   const behavior = getBehaviorById(behaviorId) ?? ZODIAC_BEHAVIORS[0];
-  return <BehaviorVideo behavior={behavior} voiceover={voiceover} />;
+  return <BehaviorVideo behavior={behavior} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 // ─── Wrapper — compat id → full uyum lookup ─────────────────────────────
 const CompatibilityWrapper: React.FC<{
   compatId: string;
   voiceover?: Voiceover;
-}> = ({ compatId, voiceover }) => {
+  tiktokClean?: boolean;
+}> = ({ compatId, voiceover, tiktokClean }) => {
   const compat = getCompatibilityById(compatId) ?? ZODIAC_COMPATIBILITY[0];
-  return <CompatibilityVideo compat={compat} voiceover={voiceover} />;
+  return <CompatibilityVideo compat={compat} voiceover={voiceover} tiktokClean={tiktokClean} />;
 };
 
 export const RemotionRoot: React.FC = () => {

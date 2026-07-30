@@ -25,7 +25,7 @@ import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 //   angel    → "Sürekli X görüyorsan"
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type NumberVideoProps = { content: NumberContent; voiceover?: Voiceover };
+export type NumberVideoProps = { content: NumberContent; voiceover?: Voiceover; tiktokClean?: boolean };
 
 // ─── Hook — sayıya göre değişir ──────────────────────────────────────────
 const Hook: React.FC<{ content: NumberContent; durFrames?: number }> = ({
@@ -172,6 +172,7 @@ const NumberReveal: React.FC<{ content: NumberContent; durFrames?: number }> = (
 export const NumberVideo: React.FC<NumberVideoProps> = ({
   content,
   voiceover,
+  tiktokClean,
 }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
@@ -183,7 +184,7 @@ export const NumberVideo: React.FC<NumberVideoProps> = ({
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       {/* Hook */}
@@ -223,7 +224,7 @@ export const NumberVideo: React.FC<NumberVideoProps> = ({
 
       {/* Logo CTA */}
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta subtitle={subtitle} />
+        {!tiktokClean && <LogoCta subtitle={subtitle} />}
       </Sequence>
     </AbsoluteFill>
   );

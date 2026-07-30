@@ -26,7 +26,7 @@ import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 // Etiketleme tetikler (kendi+partner burcu) → yorum/paylaşım patlar.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type CompatibilityVideoProps = { compat: Compatibility; voiceover?: Voiceover };
+export type CompatibilityVideoProps = { compat: Compatibility; voiceover?: Voiceover; tiktokClean?: boolean };
 
 // ─── Altın glyph (CSS mask) ──────────────────────────────────────────────
 const GoldGlyph: React.FC<{ svgFile: string; size: number; glow: number }> = ({
@@ -232,7 +232,7 @@ const BeatCard: React.FC<{ n: number; text: string; durFrames?: number }> = ({
 // ═══════════════════════════════════════════════════════════════════════════
 // Main composition
 // ═══════════════════════════════════════════════════════════════════════════
-export const CompatibilityVideo: React.FC<CompatibilityVideoProps> = ({ compat, voiceover }) => {
+export const CompatibilityVideo: React.FC<CompatibilityVideoProps> = ({ compat, voiceover, tiktokClean }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
   const s1 = getZodiacById(compat.sign1Id);
@@ -241,7 +241,7 @@ export const CompatibilityVideo: React.FC<CompatibilityVideoProps> = ({ compat, 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       <Sequence durationInFrames={g.hook.dur} layout="none">
@@ -275,7 +275,7 @@ export const CompatibilityVideo: React.FC<CompatibilityVideoProps> = ({ compat, 
       </Sequence>
 
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta subtitle="AI ile detaylı uyum analizi" />
+        {!tiktokClean && <LogoCta subtitle="AI ile detaylı uyum analizi" />}
       </Sequence>
     </AbsoluteFill>
   );

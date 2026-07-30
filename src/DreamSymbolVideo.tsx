@@ -27,6 +27,7 @@ const GOLD = "#D4A843";
 export type DreamSymbolVideoProps = {
   symbol: DreamSymbol;
   voiceover?: Voiceover;
+  tiktokClean?: boolean;
 };
 
 // ─── Star field ──────────────────────────────────────────────────────────
@@ -450,6 +451,7 @@ const LogoCta: React.FC = () => {
 export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
   symbol,
   voiceover,
+  tiktokClean,
 }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
@@ -462,7 +464,7 @@ export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
       }}
     >
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       {/* Hook */}
@@ -517,7 +519,7 @@ export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
 
       {/* Logo + CTA */}
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta />
+        {!tiktokClean && <LogoCta />}
       </Sequence>
     </AbsoluteFill>
   );

@@ -26,7 +26,7 @@ import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 // (+ seslendirme + kısık müzik). Yoksa eski sabit 15sn düzen (Studio önizleme).
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ManifestVideoProps = { content: Manifesto; voiceover?: Voiceover };
+export type ManifestVideoProps = { content: Manifesto; voiceover?: Voiceover; tiktokClean?: boolean };
 
 // ─── Hilal ay (küçük dekor) ──────────────────────────────────────────────
 const MoonDecor: React.FC<{ size: number; glow: number }> = ({ size, glow }) => (
@@ -325,6 +325,7 @@ const SpeakPrompt: React.FC<{ durFrames?: number }> = ({ durFrames }) => {
 export const ManifestVideo: React.FC<ManifestVideoProps> = ({
   content,
   voiceover,
+  tiktokClean,
 }) => {
   const { fps } = useVideoConfig();
   const g = getSegs(voiceover, fps);
@@ -338,7 +339,7 @@ export const ManifestVideo: React.FC<ManifestVideoProps> = ({
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
       <StarField />
-      <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />
+      {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
       {/* Hook (intro) */}
@@ -373,7 +374,7 @@ export const ManifestVideo: React.FC<ManifestVideoProps> = ({
 
       {/* CTA — app özelliğine direkt köprü */}
       <Sequence from={g.cta.from} durationInFrames={g.cta.dur} layout="none">
-        <LogoCta subtitle="sana özel manifesto yazar" />
+        {!tiktokClean && <LogoCta subtitle="sana özel manifesto yazar" />}
       </Sequence>
     </AbsoluteFill>
   );

@@ -61,7 +61,7 @@ jobs:
       - name: Kompozisyonu render et (MEVCUT hat — voiceover'sız)
         run: |
           mkdir -p out/tiktok
-          echo "{ \"${{ steps.pick.outputs.propKey }}\": \"${{ steps.pick.outputs.id }}\" }" > props.json
+          echo "{ \"${{ steps.pick.outputs.propKey }}\": \"${{ steps.pick.outputs.id }}\", \"tiktokClean\": true }" > props.json
           npx remotion render src/index.ts "${{ steps.pick.outputs.comp }}" out/tiktok/_raw.mp4 --props=props.json
 
       - name: Native caption + panel asset'lerine paketle
