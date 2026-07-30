@@ -695,10 +695,18 @@ function ttAssemble(
   hashtags: (string | undefined)[],
 ): TikTokMeta {
   const oneLine = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();
+  // CASE-INSENSITIVE dedup: farklı yazımlı aynı etiket (#meleksayıları vs
+  // #melekSayıları) TikTok'ta AYNI tag'e çözülür → tek kez girsin. Normalize:
+  // baştaki # at + Türkçe-farkında lowercase. İLK görüneni koru, sırayı bozma.
   const tags: string[] = [];
+  const seen = new Set<string>();
   for (const h of hashtags) {
     const t = (h ?? "").trim();
-    if (t && !tags.includes(t)) tags.push(t);
+    if (!t) continue;
+    const key = t.replace(/^#+/, "").toLocaleLowerCase("tr");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    tags.push(t);
     if (tags.length === 5) break;
   }
   const first = oneLine(line1);
