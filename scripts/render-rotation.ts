@@ -104,6 +104,12 @@ function renderOne(v: SelectedVideo, voiceover: Voiceover | null): string {
 async function main() {
   if (!existsSync(OUTPUT_DIR)) mkdirSync(OUTPUT_DIR, { recursive: true });
 
+  // Upload hatalarını topla → job'ı KIRMIZIYA düşür. Eskiden her upload catch'i
+  // hatayı yutup main() normal bitiyordu (exit 0), workflow yeşil kalıyordu →
+  // IG token 60 günde bir ölünce günlerce sessiz kalıyordu. Artık yayın-yolu
+  // (YouTube/IG) bir kez bile patlarsa çıkış kodu 1 olur, Actions kırmızı verir.
+  const uploadErrors: string[] = [];
+
   let picks = getTodaysVideos();
   if (SLOT_FILTER) {
     picks = picks.filter((v) => v.slot === SLOT_FILTER);
@@ -147,6 +153,7 @@ async function main() {
         await uploadVideoFile(auth, path, v.category, v.id, PRIVACY, publishAt);
       } catch (e) {
         console.error(`❌ Upload başarısız (${v.label} ${v.id}):`, e);
+        uploadErrors.push(`YouTube ${v.label} ${v.id}: ${e instanceof Error ? e.message : e}`);
       }
     }
     console.log(`\n🎉 Rotasyon tamamlandı — ${rendered.length} video YouTube'da!`);
@@ -175,6 +182,7 @@ async function main() {
         }
       } catch (e) {
         console.error(`   ❌ IG yayın başarısız (${v.label} ${v.id}):`, e);
+        uploadErrors.push(`Instagram ${v.label} ${v.id}: ${e instanceof Error ? e.message : e}`);
       }
     }
     console.log(`\n🎉 Instagram Reels tamamlandı!`);
@@ -198,6 +206,13 @@ async function main() {
   }
 
   console.log();
+
+  // Yayın-yolu (YouTube/IG) hatası varsa job'ı KIRMIZIYA düşür (sessiz kalma).
+  if (uploadErrors.length > 0) {
+    console.error(`\n💥 ${uploadErrors.length} yayın hatası:`);
+    for (const msg of uploadErrors) console.error(`   • ${msg}`);
+    process.exit(1);
+  }
 }
 
 main().catch((e) => {
