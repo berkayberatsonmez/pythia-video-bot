@@ -1,24 +1,23 @@
-name: Pythia TikTok Auto (daily Direct Post)
+name: Pythia TikTok Auto (PostPeer, 2 günde bir)
 
-# TAM-OTOMATİK günlük TikTok Direct Post. Render Actions'ta (Remotion tarayıcı+dakika,
-# Worker'da OLMAZ) → Release'e paketle → Worker /publish'i cron-auth ile çağır.
-# Worker Direct Post'u yapar (privacy AUDIT_MODE'a göre; onaya kadar SELF_ONLY).
+# TAM-OTOMATİK TikTok postu, PostPeer (onaylı aracı) üzerinden. Kendi Direct Post
+# başvurumuz politika gerekçesiyle reddedildi → yayın PostPeer API'siyle yapılır.
+# Render Actions'ta (Remotion) → Release'e paketle (PUBLIC repo → asset token'sız
+# indirilir) → PostPeer'e {caption + public mp4 URL} POST et; PostPeer videoyu
+# kendisi çekip TikTok'a postlar.
 #
+# Worker /publish + cron-auth koda DOKUNULMADI (artık ÇAĞRILMIYOR; panel yolu durur).
 # daily-video.yml'e (IG/YT) ve tiktok-demo.yml'e DOKUNMAZ — ayrı, bağımsız cron.
 #
-# ⚠️ GitHub cron bu repoda gecikebilir (daily-video.yml notu: ~4-5 sa). 1/gün +
-#    audit'te private olduğu için tolere edilir. Audit sonrası DAKİK saat gerekirse
-#    daily-video.yml'deki repository_dispatch (cron-job.org) desenini ekle.
+# KOTA: PostPeer ücretsiz plan 20 post/ay → cron 2 GÜNDE BİR (tek günler, max 16/ay).
+# ⚠️ GitHub cron bu repoda gecikebilir (~4-5 sa); post zaman-hassas değil, tolere edilir.
 on:
   schedule:
-    - cron: "0 9 * * *" # UTC 09:00 = TR 12:00 (öğlen; gece yarısı DEĞİL)
+    - cron: "0 9 */2 * *" # UTC 09:00, 2 günde bir (tek günler) = TR 12:00
   workflow_dispatch: {} # elle tetik
 
 permissions:
-  contents: write # gh release
-
-env:
-  WORKER_BASE: "https://pythia-tiktok-panel.contactruyatabiri.workers.dev"
+  contents: write # gh release create/upload + dedup marker
 
 jobs:
   auto:
@@ -84,24 +83,78 @@ jobs:
           TAG="${{ steps.pack.outputs.tag }}"
           gh release create "$TAG" out/tiktok/*.mp4 out/tiktok/*.meta.json out/tiktok/*.caption.txt \
             --title "Pythia TikTok auto ${{ steps.pick.outputs.date }}" \
-            --notes "Otomatik günlük Direct Post — Worker /publish çeker." \
+            --notes "Otomatik TikTok postu — public mp4 asset'ini PostPeer çeker." \
           || gh release upload "$TAG" out/tiktok/*.mp4 out/tiktok/*.meta.json out/tiktok/*.caption.txt --clobber
 
-      - name: Worker /publish çağır (cron-auth; Direct Post'u Worker yapar)
+      - name: TikTok'a PostPeer ile yayınla (Worker /publish YERİNE)
         env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          POSTPEER_API_KEY: ${{ secrets.POSTPEER_API_KEY }}
+          POSTPEER_ACCOUNT_ID: ${{ secrets.POSTPEER_ACCOUNT_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           TAG="${{ steps.pack.outputs.tag }}"
           FORMAT="${{ steps.pack.outputs.format }}"
-          echo "POST $WORKER_BASE/publish  {tag:$TAG, format:$FORMAT}"
-          HTTP=$(curl -sS -o /tmp/resp.json -w "%{http_code}" -X POST "$WORKER_BASE/publish" \
-            -H "Content-Type: application/json" \
-            -H "X-Cron-Secret: $CRON_SECRET" \
-            -d "{\"tag\":\"$TAG\",\"format\":\"$FORMAT\"}")
-          echo "HTTP $HTTP"; cat /tmp/resp.json; echo
-          # 200 published · 202 processing · 409 duplicate (dedup) → hepsi BAŞARI.
-          # Diğer kodlar → job'ı kırmızıya düşür.
-          case "$HTTP" in
-            200|202|409) echo "✓ ok ($HTTP)";;
-            *) echo "✗ publish başarısız ($HTTP)"; exit 1;;
-          esac
+          REPO="${{ github.repository }}"
+          VIDEO_URL="https://github.com/$REPO/releases/download/$TAG/$FORMAT.mp4"
+          CAPTION="$(cat "out/tiktok/$FORMAT.caption.txt")"
+
+          # ── DEDUP GUARD (Worker KV yerine Release marker; tag=gün → çift-post kes) ──
+          if gh release view "$TAG" --repo "$REPO" --json assets \
+               -q '.assets[].name' | grep -qx 'posted.tiktok.marker'; then
+            echo "✓ dedup: $TAG zaten postlanmış (marker var) — atla."; exit 0
+          fi
+
+          post_once () {   # $1 = draft(true|false) → stdout: HTTP kodu; gövde /tmp/pp.json, başlık /tmp/pp.head
+            jq -n --arg c "$CAPTION" --arg u "$VIDEO_URL" \
+                  --arg a "$POSTPEER_ACCOUNT_ID" --argjson d "$1" \
+              '{content:$c, mediaItems:[{url:$u,type:"video"}],
+                platforms:[{platform:"tiktok",accountId:$a,
+                            platformSpecificData:{draft:$d}}]}' > /tmp/pp.body.json
+            # Ağ hatasında curl 000 yazar ama non-zero döner → set -e'yi tetiklemesin
+            # ('|| true' ile fonksiyon 0 döner, döngü 000'ı görüp retry eder).
+            curl -sS -o /tmp/pp.json -D /tmp/pp.head -w "%{http_code}" \
+              -X POST "https://api.postpeer.dev/v1/posts" \
+              -H "Content-Type: application/json" \
+              -H "x-access-key: $POSTPEER_API_KEY" \
+              --data @/tmp/pp.body.json || true
+          }
+
+          log_credits () {  # kalan kredi gövdede VEYA başlıkta olabilir → savunmacı (alan adı bilinmiyor)
+            local c
+            c=$(jq -r '(.credits // .creditsRemaining // .creditsLeft // .remaining // .quota // .usage // empty)|tostring' /tmp/pp.json 2>/dev/null || true)
+            [ -n "${c:-}" ] && echo "PostPeer kalan kredi (gövde): $c"
+            grep -iE 'credit|quota|ratelimit|rate-limit|x-.*remaining' /tmp/pp.head 2>/dev/null || true
+          }
+
+          # Retry 2 deneme (kredi tüketimini sınırla: en kötü 2 public + 1 draft = 3 istek/run).
+          OK=""; DRAFT=""
+          for i in 1 2; do
+            HTTP=$(post_once false); echo "attempt $i → HTTP $HTTP"; cat /tmp/pp.json; echo; log_credits
+            case "$HTTP" in
+              2*)         OK=1; break;;                                    # kabul
+              429|5*|000) S=$((i*20)); echo "geçici ($HTTP) — ${S}s bekle"; sleep $S;;
+              *)          echo "✗ kalıcı hata ($HTTP) — retry yok"; break;;  # 400/401/403
+            esac
+          done
+
+          # ── Son çare: public başarısızsa DRAFT gönder (hiç postlamamaktansa) ──
+          if [ -z "$OK" ]; then
+            echo "public post başarısız — draft:true deniyorum"
+            HTTP=$(post_once true); echo "draft → HTTP $HTTP"; cat /tmp/pp.json; echo; log_credits
+            case "$HTTP" in 2*) OK=1; DRAFT=1;; *) echo "✗ draft de başarısız ($HTTP)"; exit 1;; esac
+          fi
+
+          # ── Başarı → dedup marker'ı Release'e yaz (aynı gün tekrar denemesin) ──
+          : > /tmp/posted.tiktok.marker
+          gh release upload "$TAG" /tmp/posted.tiktok.marker --repo "$REPO" --clobber
+
+          if [ -n "$DRAFT" ]; then
+            # SESSİZ DEĞİL: marker yazıldı (çift-post yok) AMA Actions'ta sarı uyarı bırak.
+            MSG="TikTok public post başarısız, DRAFT olarak gönderildi — TikTok uygulamasından elle yayınla ($TAG / $FORMAT)"
+            echo "::warning::$MSG"
+            echo "⚠️ $MSG" >> "$GITHUB_STEP_SUMMARY"
+            echo "✓ DRAFT gönderildi (PostPeer) + marker yazıldı."
+          else
+            echo "✓ TikTok'a gönderildi (PostPeer) + marker yazıldı."
+          fi
