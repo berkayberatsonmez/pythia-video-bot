@@ -120,17 +120,14 @@ jobs:
               --data @/tmp/pp.body.json || true
           }
 
-          log_credits () {  # kalan kredi gövdede VEYA başlıkta olabilir → savunmacı (alan adı bilinmiyor)
-            local c
-            c=$(jq -r '(.credits // .creditsRemaining // .creditsLeft // .remaining // .quota // .usage // empty)|tostring' /tmp/pp.json 2>/dev/null || true)
-            [ -n "${c:-}" ] && echo "PostPeer kalan kredi (gövde): $c"
-            grep -iE 'credit|quota|ratelimit|rate-limit|x-.*remaining' /tmp/pp.head 2>/dev/null || true
+          log_rate () {  # Yanıt yalnız DAKİKALIK istek limitini döndürüyor (aylık kredi YOK) → onu logla
+            grep -iE '^x-ratelimit-(limit|remaining|reset):' /tmp/pp.head 2>/dev/null || true
           }
 
           # Retry 2 deneme (kredi tüketimini sınırla: en kötü 2 public + 1 draft = 3 istek/run).
           OK=""; DRAFT=""
           for i in 1 2; do
-            HTTP=$(post_once false); echo "attempt $i → HTTP $HTTP"; cat /tmp/pp.json; echo; log_credits
+            HTTP=$(post_once false); echo "attempt $i → HTTP $HTTP"; cat /tmp/pp.json; echo; log_rate
             case "$HTTP" in
               2*)         OK=1; break;;                                    # kabul
               429|5*|000) S=$((i*20)); echo "geçici ($HTTP) — ${S}s bekle"; sleep $S;;
@@ -141,13 +138,22 @@ jobs:
           # ── Son çare: public başarısızsa DRAFT gönder (hiç postlamamaktansa) ──
           if [ -z "$OK" ]; then
             echo "public post başarısız — draft:true deniyorum"
-            HTTP=$(post_once true); echo "draft → HTTP $HTTP"; cat /tmp/pp.json; echo; log_credits
+            HTTP=$(post_once true); echo "draft → HTTP $HTTP"; cat /tmp/pp.json; echo; log_rate
             case "$HTTP" in 2*) OK=1; DRAFT=1;; *) echo "✗ draft de başarısız ($HTTP)"; exit 1;; esac
           fi
 
           # ── Başarı → dedup marker'ı Release'e yaz (aynı gün tekrar denemesin) ──
-          : > /tmp/posted.tiktok.marker
-          gh release upload "$TAG" /tmp/posted.tiktok.marker --repo "$REPO" --clobber
+          # Marker BOŞ OLMAMALI: GitHub asset upload boş dosyayı 400 (Bad Content-Length)
+          # ile reddeder → içerik yaz (postId varsa ekle, yoksa tarih yeter).
+          POST_ID=$(jq -r '(.postId // .id // .data.postId // empty)' /tmp/pp.json 2>/dev/null || true)
+          printf 'posted %s postId=%s\n' "$(date -u +%FT%TZ)" "${POST_ID:-?}" > /tmp/posted.tiktok.marker
+          # Marker upload başarısız olsa POST ZATEN GİTTİ → job'ı KIRMIZIYA DÜŞÜRME;
+          # yalnız uyarı bırak (exit 1 yanıltıcı olurdu).
+          if ! gh release upload "$TAG" /tmp/posted.tiktok.marker --repo "$REPO" --clobber; then
+            MMSG="dedup marker yüklenemedi ($TAG) — TikTok postu BAŞARILI, job yeşil; marker olmadan aynı gün tekrar tetiklenirse çift-post riski"
+            echo "::warning::$MMSG"
+            echo "⚠️ $MMSG" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
           if [ -n "$DRAFT" ]; then
             # SESSİZ DEĞİL: marker yazıldı (çift-post yok) AMA Actions'ta sarı uyarı bırak.
