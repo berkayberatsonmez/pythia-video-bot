@@ -21,7 +21,14 @@
 const IG_BASE = "https://graph.instagram.com";
 
 // ─── Ayarlar ──────────────────────────────────────────────────────────────
-const MEDIA_LIMIT = 5; // kaç gönderinin yorumlarına bakılsın
+// Instagram Login API'de "tüm medyadaki son yorumlar" diye tek bir uç YOK.
+// Gönderi gönderi dolaşmak zorundayız → son N gönderiyi tarıyoruz.
+// Günde ~2 paylaşımda 40 gönderi ≈ son 3 hafta. Daha eskisine yorum gelirse
+// kaçar; gerçek zamanlı istiyorsak Meta webhook'u gerekir (bkz. dosya sonu).
+const MEDIA_SCAN = 40; // kaç gönderi taransın (sayfalama ile)
+const MEDIA_PAGE = 25; // /me/media sayfa boyutu
+const COMMENT_PAGES = 4; // gönderi başına en fazla kaç yorum sayfası çekilsin
+const MAX_COMMENT_AGE_DAYS = 30; // bundan eski yorumlara yanıt verilmez
 const MAX_PER_MEDIA = 6; // gönderi başına en fazla kaç yanıt
 const MAX_TOTAL = 20; // bir çalıştırmada toplam en fazla kaç yanıt
 const MIN_LEN = 12; // bundan kısa yorumlar atlanır (soru işareti varsa yine cevaplanır)
@@ -105,6 +112,32 @@ async function igPost(path: string, params: Record<string, string>): Promise<any
   return json;
 }
 
+/**
+ * Sayfalı GET — paging.next zincirini takip eder.
+ * Yorumlar tek sayfaya sığmayabiliyor; ilk sayfayla yetinirsek çok yorumlu
+ * gönderilerde yeni yorumları kaçırırız.
+ */
+async function igGetAll(
+  path: string,
+  params: Record<string, string>,
+  maxPages: number,
+  maxItems: number,
+): Promise<any[]> {
+  const out: any[] = [];
+  let url = `${IG_BASE}/${path}?${new URLSearchParams({ ...params, access_token: token() })}`;
+
+  for (let page = 0; page < maxPages && url && out.length < maxItems; page++) {
+    const res = await fetch(url);
+    const json: any = await res.json().catch(() => ({}));
+    if (!res.ok || json?.error) {
+      throw new Error(`IG GET ${path} → ${JSON.stringify(json?.error ?? json)}`);
+    }
+    out.push(...(json.data ?? []));
+    url = json.paging?.next ?? "";
+  }
+  return out.slice(0, maxItems);
+}
+
 // ─── Saf yardımcılar ──────────────────────────────────────────────────────
 /** Türkçe'ye uygun küçültme (İ→i, I→ı). */
 function lower(s: string): string {
@@ -140,6 +173,13 @@ function shouldSkip(text: string): string | null {
   return null;
 }
 
+/** Çok eski yorumlara yanıt vermek tuhaf duruyor — yaş sınırı. */
+function tooOld(timestamp: string): boolean {
+  const t = Date.parse(timestamp || "");
+  if (!t) return false; // tarih okunamadıysa engelleme
+  return Date.now() - t > MAX_COMMENT_AGE_DAYS * 86400000;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
@@ -148,31 +188,37 @@ async function run(dry: boolean): Promise<void> {
   const myName = String(me.username || "");
   console.log(`👤 Hesap: @${myName}${dry ? "   (DRY RUN — hiçbir şey gönderilmeyecek)" : ""}`);
 
-  const media = await igGet("me/media", {
-    fields: "id,caption,timestamp,permalink",
-    limit: String(MEDIA_LIMIT),
-  });
+  const media = await igGetAll(
+    "me/media",
+    { fields: "id,caption,timestamp,permalink", limit: String(MEDIA_PAGE) },
+    Math.ceil(MEDIA_SCAN / MEDIA_PAGE),
+    MEDIA_SCAN,
+  );
+  console.log(`📚 Taranacak gönderi: ${media.length} (en yeniden geriye)`);
 
   let total = 0;
   let skipped = 0;
 
-  for (const m of media.data ?? []) {
+  for (const m of media) {
     if (total >= MAX_TOTAL) break;
 
     const poolName = detectPool(String(m.caption || ""));
     const pool = POOLS[poolName] ?? POOLS.general;
 
-    let list: any;
+    let comments: any[];
     try {
-      list = await igGet(`${m.id}/comments`, {
-        fields: "id,text,username,timestamp,replies{id,username}",
-      });
+      comments = await igGetAll(
+        `${m.id}/comments`,
+        { fields: "id,text,username,timestamp,replies{id,username}", limit: "50" },
+        COMMENT_PAGES,
+        COMMENT_PAGES * 50,
+      );
     } catch (e) {
       console.log(`  ⚠️  ${m.id} yorumları okunamadı: ${e}`);
       continue;
     }
 
-    const comments = list.data ?? [];
+    if (comments.length === 0) continue; // yorumsuz gönderiler logu şişirmesin
     console.log(`\n📸 ${m.id} [${poolName}] — ${comments.length} yorum`);
 
     let perMedia = 0;
@@ -183,6 +229,7 @@ async function run(dry: boolean): Promise<void> {
       const user = String(c.username || "");
 
       if (user === myName) continue; // kendi ilk yorumumuz (hashtag/CTA)
+      if (tooOld(String(c.timestamp || ""))) continue; // aylık geçmiş yoruma yanıt tuhaf durur
 
       const alreadyReplied = (c.replies?.data ?? []).some(
         (r: any) => String(r.username || "") === myName,
