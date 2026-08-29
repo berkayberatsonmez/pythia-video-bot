@@ -180,6 +180,36 @@ function tooOld(timestamp: string): boolean {
   return Date.now() - t > MAX_COMMENT_AGE_DAYS * 86400000;
 }
 
+/**
+ * TEŞHİS MERDİVENİ — yorum ucu boş dönerken hangi biçimin çalıştığını bulur.
+ * data:[] + dolu imleç, "uç var ama içerik filtrelendi" demek. Alan alan daraltıyoruz.
+ */
+async function probeComments(mediaId: string): Promise<void> {
+  const tries: Array<[string, string]> = [
+    ["uc / alansiz", `${mediaId}/comments`],
+    ["uc / id", `${mediaId}/comments?fields=id`],
+    ["uc / id,text", `${mediaId}/comments?fields=id,text`],
+    ["uc / id,text,username", `${mediaId}/comments?fields=id,text,username`],
+    ["uc / id,text,from", `${mediaId}/comments?fields=id,text,from`],
+    ["medyadan ic ice", `${mediaId}?fields=comments_count,comments{id,text,username}`],
+    ["medyadan ic ice / alansiz", `${mediaId}?fields=comments`],
+  ];
+  console.log("  -- TESHIS MERDIVENI --");
+  for (const [label, path] of tries) {
+    const sep = path.includes("?") ? "&" : "?";
+    const url = `${IG_BASE}/${path}${sep}access_token=${encodeURIComponent(token())}`;
+    try {
+      const res = await fetch(url);
+      const body = await res.text();
+      const short = body.length > 220 ? body.slice(0, 220) + "..." : body;
+      console.log(`   [${res.status}] ${label}: ${short}`);
+    } catch (e) {
+      console.log(`   [ERR] ${label}: ${e}`);
+    }
+  }
+  console.log("  ----------------------");
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
@@ -226,6 +256,7 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
 
   let total = 0;
   let skipped = 0;
+  let probed = false;
 
   for (const m of media) {
     if (total >= MAX_TOTAL) break;
@@ -257,13 +288,9 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
     if (comments.length === 0) {
       // Gönderide yorum VAR ama uç boş döndü → izin ya da alan sorunu.
       console.log(`  🚨 ${count} yorum olmasına rağmen uç BOŞ döndü.`);
-      if (debug) {
-        try {
-          const raw = await igGet(`${m.id}/comments`, { fields: "id,text,username" });
-          console.log(`  RAW (replies alanı olmadan): ${JSON.stringify(raw).slice(0, 500)}`);
-        } catch (e) {
-          console.log(`  RAW denemesi de hata verdi: ${e}`);
-        }
+      if (debug && !probed) {
+        probed = true; // merdiveni tek gönderide çalıştır, logu şişirme
+        await probeComments(String(m.id));
       }
       continue;
     }
