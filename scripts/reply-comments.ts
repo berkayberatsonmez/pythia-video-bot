@@ -1,4 +1,23 @@
 // ═══════════════════════════════════════════════════════════════════════════
+// ⚠️  DURUM: BEKLEMEDE — kod çalışıyor, Meta izin vermiyor.
+//
+//   Teşhis (2026-08-29, debug çalıştırmalarıyla kanıtlandı):
+//     • 40 gönderi, comments_count toplam 212 → sayı okunuyor
+//     • /{media}/comments her seferinde data:[] + DOLU paging.cursors
+//     • /{media}?fields=comments{...} → comments alanı sessizce düşüyor
+//     • instagram_business_manage_comments durumu: "Ready for testing"
+//       (= Standard Access: yalnız app rolü olan kişilerin verisi görünür)
+//   Yorum yazanlar tester değil → metinleri filtreleniyor, sayı geliyor.
+//
+//   Advanced Access için Meta şunları istiyor: Tech Provider olmak (GERİ
+//   ALINAMAZ) + business verification (şirket + vergi no) + access
+//   verification + App Review. Şirket olmadığı için başvurulamıyor.
+//
+//   Workflow cron'u bu yüzden KAPALI. Kod ve metin havuzu hazır duruyor;
+//   advanced access alınırsa cron'u aç, başka değişiklik gerekmiyor.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
 // reply-comments.ts — Instagram yorumlarına otomatik yanıt
 //
 // Akış (graph.instagram.com, upload-instagram.ts ile aynı token):

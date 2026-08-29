@@ -7,10 +7,18 @@ name: Pythia IG Yorum Yanıtla
 #   12:20 → öğleden sonra turu   ·   20:20 → akşam turu
 # Bu repoda cron gecikebiliyor (bkz. daily-video.yml notu); sorun değil,
 # script zaten cevaplanmış yorumları API'den görüp atlıyor.
+# ⚠️ CRON KAPALI — Meta yorum OKUMAYI advanced access'e bagladi ve o da
+# Tech Provider + business verification (sirket + vergi no) gerektiriyor.
+# Sirket olmadigi icin basvuru yapilamiyor. Bot su an yorumlari goremez;
+# bos calisip Actions dakikasi yakmasin diye zamanlama devre disi.
+# Ileride sirket kurulur ve advanced access alinirsa: asagidaki schedule
+# blogunun yorumunu kaldir, baska hicbir sey degistirmeye gerek yok.
+#
+# on:
+#   schedule:
+#     - cron: "20 12 * * *"
+#     - cron: "20 20 * * *"
 on:
-  schedule:
-    - cron: "20 12 * * *"
-    - cron: "20 20 * * *"
   workflow_dispatch:
     inputs:
       dry:
