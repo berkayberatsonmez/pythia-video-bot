@@ -183,24 +183,55 @@ function tooOld(timestamp: string): boolean {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
-async function run(dry: boolean): Promise<void> {
+async function run(dry: boolean, debug: boolean): Promise<void> {
   const me = await igGet("me", { fields: "id,username" });
   const myName = String(me.username || "");
   console.log(`👤 Hesap: @${myName}${dry ? "   (DRY RUN — hiçbir şey gönderilmeyecek)" : ""}`);
 
   const media = await igGetAll(
     "me/media",
-    { fields: "id,caption,timestamp,permalink", limit: String(MEDIA_PAGE) },
+    {
+      // comments_count MEDYA alanı — yorum ucundan bağımsız okunur.
+      // Teşhis anahtarı: count > 0 ama uç boş dönüyorsa sorun izinde/uçta,
+      // count = 0 ise gönderide gerçekten yorum yok.
+      fields: "id,caption,timestamp,permalink,media_type,comments_count",
+      limit: String(MEDIA_PAGE),
+    },
     Math.ceil(MEDIA_SCAN / MEDIA_PAGE),
     MEDIA_SCAN,
   );
-  console.log(`📚 Taranacak gönderi: ${media.length} (en yeniden geriye)`);
+  const withComments = media.filter((m: any) => Number(m.comments_count || 0) > 0);
+  console.log(
+    `📚 Taranan gönderi: ${media.length} (en yeniden geriye) · ` +
+      `yorumu olan: ${withComments.length} · ` +
+      `toplam yorum: ${media.reduce((s: number, m: any) => s + Number(m.comments_count || 0), 0)}`,
+  );
+  if (debug) {
+    console.log("");
+    console.log("-- DEBUG: en yeni 5 gonderi --");
+    for (const m of media.slice(0, 5) as any[]) {
+      console.log(
+        `   ${m.id} | ${m.media_type ?? "?"} | ${String(m.timestamp).slice(0, 16)} | ` +
+          `comments_count=${m.comments_count ?? "?"} | ${m.permalink ?? "-"}`,
+      );
+    }
+    console.log("------------------------------");
+  } else if (media.length) {
+    const m0: any = media[0];
+    console.log(
+      `   en yeni: ${m0.id} ${m0.media_type ?? "?"} ${String(m0.timestamp).slice(0, 10)} ` +
+        `comments_count=${m0.comments_count ?? "?"}`,
+    );
+  }
 
   let total = 0;
   let skipped = 0;
 
   for (const m of media) {
     if (total >= MAX_TOTAL) break;
+
+    const count = Number(m.comments_count || 0);
+    if (count === 0) continue; // gerçekten yorumsuz — uca hiç gitme
 
     const poolName = detectPool(String(m.caption || ""));
     const pool = POOLS[poolName] ?? POOLS.general;
@@ -214,12 +245,28 @@ async function run(dry: boolean): Promise<void> {
         COMMENT_PAGES * 50,
       );
     } catch (e) {
-      console.log(`  ⚠️  ${m.id} yorumları okunamadı: ${e}`);
+      console.log(`\n📸 ${m.id} [${poolName}] — comments_count=${count}`);
+      console.log(`  ⚠️  yorum ucu HATA verdi: ${e}`);
       continue;
     }
 
-    if (comments.length === 0) continue; // yorumsuz gönderiler logu şişirmesin
-    console.log(`\n📸 ${m.id} [${poolName}] — ${comments.length} yorum`);
+    console.log(
+      `\n📸 ${m.id} [${poolName}] — comments_count=${count}, uçtan gelen=${comments.length}`,
+    );
+
+    if (comments.length === 0) {
+      // Gönderide yorum VAR ama uç boş döndü → izin ya da alan sorunu.
+      console.log(`  🚨 ${count} yorum olmasına rağmen uç BOŞ döndü.`);
+      if (debug) {
+        try {
+          const raw = await igGet(`${m.id}/comments`, { fields: "id,text,username" });
+          console.log(`  RAW (replies alanı olmadan): ${JSON.stringify(raw).slice(0, 500)}`);
+        } catch (e) {
+          console.log(`  RAW denemesi de hata verdi: ${e}`);
+        }
+      }
+      continue;
+    }
 
     let perMedia = 0;
     for (const c of comments) {
@@ -267,7 +314,7 @@ async function run(dry: boolean): Promise<void> {
 }
 
 if (require.main === module) {
-  run(process.argv.includes("--dry")).catch((e) => {
+  run(process.argv.includes("--dry"), process.argv.includes("--debug")).catch((e) => {
     console.error("💥 Yorum yanıtlama hatası:", e);
     process.exit(1);
   });

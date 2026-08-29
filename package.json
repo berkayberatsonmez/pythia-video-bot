@@ -41,7 +41,8 @@
     "upload:instagram": "tsx scripts/upload-instagram.ts",
     "upload:tiktok": "tsx scripts/upload-tiktok.ts",
     "reply:comments": "tsx scripts/reply-comments.ts",
-    "reply:dry": "tsx scripts/reply-comments.ts --dry"
+    "reply:dry": "tsx scripts/reply-comments.ts --dry",
+    "reply:debug": "tsx scripts/reply-comments.ts --dry --debug"
   },
   "sideEffects": [
     "*.css"

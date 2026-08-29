@@ -17,6 +17,10 @@ on:
         description: "Kuru çalıştırma (hiçbir yanıt gönderilmez, sadece ne yapacağını yazar)"
         type: boolean
         default: true
+      debug:
+        description: "Teşhis modu (medya listesi + ham API cevabı yazdırılır)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -43,7 +47,11 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
         run: |
           # Manuel tetiklemede varsayılan KURU; cron'da her zaman gerçek gönderim.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry }}" = "true" ]; then
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            npm run reply:comments          # cron → her zaman gerçek gönderim
+          elif [ "${{ inputs.debug }}" = "true" ]; then
+            npm run reply:debug             # teşhis (her zaman kuru)
+          elif [ "${{ inputs.dry }}" = "true" ]; then
             npm run reply:dry
           else
             npm run reply:comments
