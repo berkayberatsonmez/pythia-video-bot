@@ -18,6 +18,8 @@
 //   tsx scripts/reply-comments.ts         → gerçekten yanıtlar
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { createHash } from "node:crypto";
+
 const IG_BASE = "https://graph.instagram.com";
 
 // ─── Ayarlar ──────────────────────────────────────────────────────────────
@@ -214,8 +216,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
 async function run(dry: boolean, debug: boolean): Promise<void> {
-  const me = await igGet("me", { fields: "id,username" });
+  const me = await igGet("me", { fields: "id,username,account_type" });
   const myName = String(me.username || "");
+  if (debug) {
+    // Token PARMAK IZI - token degil, hash. Secret gercekten degisti mi anlamak icin.
+    const fp = createHash("sha256").update(token()).digest("hex").slice(0, 10);
+    console.log(`   token parmak izi: ${fp} | uzunluk: ${token().length}`);
+    console.log(`   hesap tipi: ${me.account_type ?? "?"} | id: ${me.id ?? "?"}`);
+  }
   console.log(`👤 Hesap: @${myName}${dry ? "   (DRY RUN — hiçbir şey gönderilmeyecek)" : ""}`);
 
   const media = await igGetAll(
