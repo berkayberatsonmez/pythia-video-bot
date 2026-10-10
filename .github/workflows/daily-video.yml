@@ -81,8 +81,8 @@ jobs:
             ACTION="${{ github.event.action }}"
             echo "▶ Dış tetik (dakik): $ACTION"
             case "$ACTION" in
-              ig-morning) npm run rotation -- --instagram --tiktok --slot morning ;;
-              ig-evening) npm run rotation -- --instagram --tiktok --slot evening ;;
+              ig-morning) npm run rotation -- --instagram --slot morning ;;
+              ig-evening) npm run rotation -- --instagram --slot evening ;;
               *)          echo "⚠️ Bilinmeyen dispatch ($ACTION) — atlanıyor" ;;
             esac
           elif [ "$EVENT" = "schedule" ]; then
@@ -90,19 +90,19 @@ jobs:
             echo "▶ Zamanlı (GitHub cron, yedek): $SCHED"
             case "$SCHED" in
               "41 3 * * *") npm run rotation -- --upload --slot morning ;; # YT 1/gün (retention)
-              "7 10 * * *") npm run rotation -- --instagram --tiktok --slot morning ;;
-              "7 18 * * *") npm run rotation -- --instagram --tiktok --slot evening ;;
+              "7 10 * * *") npm run rotation -- --instagram --slot morning ;;
+              "7 18 * * *") npm run rotation -- --instagram --slot evening ;;
               *)            echo "⚠️ Bilinmeyen schedule ($SCHED) — atlanıyor" ;;
             esac
           else
             MODE="${{ github.event.inputs.mode }}"
             echo "▶ Manuel: $MODE"
             case "$MODE" in
-              instagram)   npm run rotation -- --instagram --tiktok ;;
+              instagram)   npm run rotation -- --instagram ;;
               youtube)     npm run rotation -- --upload --slot morning ;; # YT 1/gün
               tiktok)      npm run rotation -- --tiktok --slot morning ;; # SADECE TikTok drafts (IG/YT yok) — test/manuel
               commenttest) npx tsx scripts/upload-instagram.ts --comment-test ;;
-              *)           npm run rotation -- --upload --instagram --tiktok ;;
+              *)           npm run rotation -- --upload --instagram ;;
             esac
           fi
 
