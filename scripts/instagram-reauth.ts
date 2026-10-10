@@ -16,7 +16,7 @@
 // ÖN KOŞUL (Meta App Dashboard → Instagram → API setup with Instagram login):
 //   • IG_APP_ID ve IG_APP_SECRET env olarak verilmeli
 //   • Redirect URI panelde KAYITLI olmalı (aşağıdaki REDIRECT ile birebir aynı)
-//   • İzinlerde instagram_business_manage_comments işaretli olmalı
+//   • İzinlerde instagram_business_manage_comments ve instagram_business_manage_insights işaretli olmalı
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { spawnSync } from "node:child_process";
@@ -24,10 +24,13 @@ import { spawnSync } from "node:child_process";
 const REPO = "berkayberatsonmez/pythia-video-bot";
 
 // Yorum okumak için manage_comments ŞART. Diğer ikisi mevcut işleyişi korur.
+// manage_insights: yayın analitiği /insights (views, reach, shares, saved) okur;
+// yoksa analytics koşusu "needs_scope:instagram_business_manage_insights" yazıp geçer.
 const SCOPES = [
   "instagram_business_basic",
   "instagram_business_content_publish",
   "instagram_business_manage_comments",
+  "instagram_business_manage_insights",
 ].join(",");
 
 const REDIRECT =

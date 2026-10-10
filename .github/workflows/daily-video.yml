@@ -54,6 +54,7 @@ jobs:
           sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
 
       - name: Bağımlılıkları kur
+        id: deps
         run: npm ci
 
       - name: Remotion tarayıcısını hazırla
@@ -104,3 +105,22 @@ jobs:
               *)           npm run rotation -- --upload --instagram --tiktok ;;
             esac
           fi
+
+      - name: Yayın kayıtlarını artifact olarak sakla
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-journal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/analytics/events.jsonl
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # Public depoya arşiv (bilinçli — bkz. scripts/analytics/archive.ts): yalnız public
+      # post ID/URL + sayaçlar. Hata YAYINI/job'ı asla kırmaz (push zaten hata yutar).
+      - name: Yayın kayıtlarını arşivle (video-observability release)
+        if: always() && steps.deps.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run analytics:push || echo "::warning::analytics arşivi atlandı"

@@ -23,6 +23,8 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { google } from "googleapis";
 import { buildMetadata } from "./metadata";
+import { trackPublication } from "./analytics/ledger";
+import { publicationContent, type ContentContext } from "./analytics/content";
 
 // googleapis ve google-auth-library iki ayrı OAuth2Client tipi export ediyor
 // (duplicate dependency). Runtime'da sorun yok; tsc'yi susturmak için alias.
@@ -30,7 +32,15 @@ import { buildMetadata } from "./metadata";
 type OAuth2Client = any;
 
 // ─── Config ──────────────────────────────────────────────────────────────
-const SCOPES = ["https://www.googleapis.com/auth/youtube.upload"];
+// readonly: yayın analitiği (scripts/analytics/providers.ts) videos.list +
+// channels.list?mine çağırır — upload scope'u buna YETMEZ. Upload yetkisine
+// dokunmaz, yalnız "yüklediğim videoların durum/sayaçlarını oku" açılır.
+// Mevcut token yalnız upload'lı: tek seferlik `youtube-reauth.ts` sonrası geçerli
+// olur; o zamana dek analytics koşusu "needs_scope:youtube.readonly" yazıp geçer.
+const SCOPES = [
+  "https://www.googleapis.com/auth/youtube.upload",
+  "https://www.googleapis.com/auth/youtube.readonly",
+];
 const CREDENTIALS_PATH = join(process.cwd(), "scripts", "credentials.json");
 const TOKEN_PATH = join(process.cwd(), "scripts", "token.json");
 
@@ -128,7 +138,8 @@ async function authorize(): Promise<OAuth2Client> {
 }
 
 // ─── Upload (kategori-bilinçli) ──────────────────────────────────────────
-export async function uploadVideoFile(
+// Gönderim mantığı: yayın günlüğünden ÖNCEKİ halinden DEĞİŞMEDİ.
+async function sendVideoFile(
   auth: OAuth2Client,
   videoPath: string,
   category: string,
@@ -177,6 +188,43 @@ export async function uploadVideoFile(
   const url = `https://youtube.com/shorts/${videoId}`;
   console.log(`✅ Yüklendi: ${url}`);
   return url;
+}
+
+/**
+ * Yükleme + yayın günlüğü. Davranış sendVideoFile ile AYNI: aynı dönüş değeri,
+ * aynı hata (yeniden fırlatılır). Günlük yazım hataları yutulur (ledger.trackPublication).
+ */
+export async function uploadVideoFile(
+  auth: OAuth2Client,
+  videoPath: string,
+  category: string,
+  id: string,
+  privacy: string,
+  publishAt?: string,
+  context: ContentContext = {},
+): Promise<string> {
+  return trackPublication(
+    {
+      platform: "youtube",
+      provider: "youtube",
+      content: publicationContent("youtube", category, id, context),
+    },
+    () => sendVideoFile(auth, videoPath, category, id, privacy, publishAt),
+    (url) => {
+      let platformId: string | undefined;
+      try {
+        platformId = new URL(url).pathname.split("/").pop() || undefined;
+      } catch {
+        /* beklenmeyen biçim → ID'siz kayıt */
+      }
+      return {
+        state: publishAt ? "scheduled" : "submitted",
+        publishAt,
+        platformId,
+        url,
+      };
+    },
+  );
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────

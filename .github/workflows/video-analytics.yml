@@ -1,0 +1,75 @@
+name: Pythia Yayın ve Performans Raporu
+
+# Yayın günlüğünü (YouTube / Instagram / TikTok-PostPeer) okur, durum + sayaç
+# snapshot'ı yazar, rapor üretir. Yayın workflow'larından BAĞIMSIZ: buradaki hiçbir
+# hata yayını etkilemez. Yetki eksikse (YouTube readonly / IG insights) ilgili
+# sayaçlar "needs_scope:*" notuyla boş kalır, koşu YEŞİL biter.
+on:
+  schedule:
+    - cron: "37 7 * * *" # TR 10:37; önceki yayınların durumunu ve sayaçlarını okur
+  workflow_dispatch:
+    inputs:
+      postpeer_metrics_budget:
+        description: "Bu koşuda PostPeer metrikleri için en fazla kredi (0=kapalı, en fazla 10)"
+        type: number
+        default: 0
+
+permissions:
+  contents: write # video-observability release'ine günlük asset'i yükler
+
+concurrency:
+  group: video-analytics
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Bağımlılıklar
+        id: deps
+        run: npm ci
+      - name: Kayıt ve rapor testleri
+        run: npm run verify:analytics
+      - name: Arşivi indir
+        run: npm run analytics:pull
+      - name: YouTube kimlik dosyalarını hazırla
+        env:
+          CREDS_B64: ${{ secrets.GOOGLE_CREDENTIALS_B64 }}
+          TOKEN_B64: ${{ secrets.GOOGLE_TOKEN_B64 }}
+        run: |
+          if [ -n "$CREDS_B64" ] && [ -n "$TOKEN_B64" ]; then
+            printf '%s' "$CREDS_B64" | base64 -d > scripts/credentials.json
+            printf '%s' "$TOKEN_B64" | base64 -d > scripts/token.json
+          fi
+      - name: Yayın durumlarını ve metrikleri oku
+        # Okuma hataları (yetki, ağ, kota) snapshot'a kod olarak yazılır; ne olursa olsun job yeşil kalır.
+        continue-on-error: true
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          POSTPEER_API_KEY: ${{ secrets.POSTPEER_API_KEY }}
+          POSTPEER_METRICS_BUDGET: ${{ inputs.postpeer_metrics_budget || 0 }}
+        run: npm run analytics:collect
+      - name: Raporu ve yeni ölçümleri sakla
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-analytics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            out/analytics/events.jsonl
+            out/analytics/report.md
+            out/analytics/report.json
+          if-no-files-found: ignore
+          retention-days: 90
+      - name: Yeni ölçümleri arşive ekle
+        if: always() && steps.deps.outcome == 'success'
+        continue-on-error: true
+        run: npm run analytics:push
