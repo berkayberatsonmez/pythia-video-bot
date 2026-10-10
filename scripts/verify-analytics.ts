@@ -45,6 +45,9 @@ import {
   classifyGoogleError,
   NEEDS_YT_SCOPE,
   NEEDS_IG_SCOPE,
+  parseChannelId,
+  parseYoutubeFeed,
+  resolveYoutubeChannelId,
 } from "./analytics/providers";
 import { archiveRepo } from "./analytics/archive";
 import { poolKeyFor, publicationContent } from "./analytics/content";
@@ -376,12 +379,14 @@ async function main() {
       platform: "youtube",
       platformId: "video-a",
     };
+    process.env.YT_RSS_FALLBACK = "0"; // bu blok yalnız OAuth yolunu sınar
     for (let i = 0; i < 2; i++)
       await assert.rejects(scopeCollector(ytEvent), (e: unknown) => {
         assert.ok(e instanceof ApiReadError);
         assert.equal(e.code, NEEDS_YT_SCOPE);
         return true;
       });
+    delete process.env.YT_RSS_FALLBACK;
     assert.equal(ytCalls, 1, "yetki hatası sonrası diğer videolar için API tekrar çağrılmaz");
     // Yetki VARSA: kanal doğrulanır, sayaçlar okunur.
     const okCollector = createCollector(
@@ -407,6 +412,201 @@ async function main() {
     );
     await assert.rejects(otherChannel(ytEvent), /youtube_channel_mismatch/);
 
+    // ── YouTube RSS yedeği (OAuth'suz izlenme) — sabit veriyle, ağ yok ──
+    const CHANNEL = "UC" + "a".repeat(22);
+    const feedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <title>Pythia</title><published>2025-01-01T00:00:00+00:00</published>
+ <entry><id>yt:video:AAAAAAAAAAA</id><yt:videoId>AAAAAAAAAAA</yt:videoId><title>Bir</title>
+  <published>2026-10-01T10:00:00+00:00</published>
+  <media:group><media:community><media:starRating count="3" average="5.00" min="1" max="5"/><media:statistics views="1234"/></media:community></media:group></entry>
+ <entry><yt:videoId>BBBBBBBBBBB</yt:videoId><published>2026-10-02T10:00:00+00:00</published>
+  <media:group><media:title>statistics yok</media:title></media:group></entry>
+ <entry><title>videoId yok</title></entry>
+</feed>`;
+    const parsed = parseYoutubeFeed(feedXml);
+    assert.equal(parsed.length, 2, "videoId'siz girdi atlanır");
+    assert.deepEqual(parsed[0], {
+      videoId: "AAAAAAAAAAA",
+      publishedAt: "2026-10-01T10:00:00+00:00",
+      views: 1234,
+    });
+    assert.equal(parsed[1].views, null, "statistics yoksa null");
+    assert.deepEqual(parseYoutubeFeed("not xml"), []);
+
+    assert.equal(
+      parseChannelId(
+        `<link rel="canonical" href="https://www.youtube.com/channel/${CHANNEL}"><script>{"channelId":"UC${"b".repeat(22)}"}</script>`,
+      ),
+      CHANNEL,
+      "canonical link önceliklidir",
+    );
+    assert.equal(parseChannelId(`x{"channelId":"${CHANNEL}"}y`), CHANNEL);
+    assert.equal(parseChannelId(`{"externalId":"${CHANNEL}"}`), CHANNEL);
+    assert.equal(parseChannelId(`{"channelId":"UCkisa"}`), undefined);
+    assert.equal(parseChannelId("<html></html>"), undefined);
+
+    const calls: string[] = [];
+    const rssFetch = (async (url: string, init?: RequestInit) => {
+      calls.push(String(url));
+      assert.ok(init?.signal, "zaman aşımı sinyali olmalı");
+      assert.match(
+        String((init?.headers as Record<string, string>)["User-Agent"]),
+        /Mozilla\/5\.0/,
+      );
+      if (String(url).includes("/feeds/videos.xml")) {
+        assert.ok(String(url).endsWith(`channel_id=${CHANNEL}`));
+        return new Response(feedXml);
+      }
+      assert.match(String(url), /youtube\.com\/@\w+$/);
+      return new Response(`<link rel="canonical" href="https://www.youtube.com/channel/${CHANNEL}">`);
+    }) as unknown as typeof fetch;
+    const rssDir = mkdtempSync(join(tmpdir(), "pythia-analytics-rss-"));
+    const savedRss = {
+      dir: process.env.ANALYTICS_DIR,
+      id: process.env.YT_CHANNEL_ID,
+      handle: process.env.YT_CHANNEL_HANDLE,
+    };
+    process.env.ANALYTICS_DIR = rssDir;
+    delete process.env.YT_CHANNEL_ID;
+    delete process.env.YT_CHANNEL_HANDLE;
+    try {
+      // Handle → kanal ID, sonra önbellekten (ikinci çağrıda ağ yok).
+      assert.equal(await resolveYoutubeChannelId(rssFetch, 0), CHANNEL);
+      assert.equal(calls.length, 1);
+      assert.ok(calls[0].endsWith("/@Pythiamystic"), "varsayılan handle");
+      assert.equal(await resolveYoutubeChannelId(rssFetch, 0), CHANNEL);
+      assert.equal(calls.length, 1, "önbellek varken handle sorgusu atlanır");
+      process.env.YT_CHANNEL_HANDLE = "@baskaKanal";
+      rmSync(join(rssDir, "yt-channel-id.json"));
+      assert.equal(await resolveYoutubeChannelId(rssFetch, 0), CHANNEL);
+      assert.ok(calls[1].endsWith("/@baskaKanal"));
+      delete process.env.YT_CHANNEL_HANDLE;
+      process.env.YT_CHANNEL_ID = `UC${"c".repeat(22)}`;
+      assert.equal(await resolveYoutubeChannelId(rssFetch, 0), process.env.YT_CHANNEL_ID);
+      assert.equal(calls.length, 2, "YT_CHANNEL_ID varken ağ yok");
+      delete process.env.YT_CHANNEL_ID;
+      rmSync(join(rssDir, "yt-channel-id.json"), { force: true });
+
+      // Yetki hatası → RSS: feed'deki video dolar, eksik/eski olanlar null + sorun kodu.
+      const noScope = () =>
+        ({
+          channels: { list: async () => { throw scopeError; } },
+          videos: { list: async () => assert.fail("videos.list çağrılmamalı") },
+        }) as never;
+      calls.length = 0;
+      const rssCollector = createCollector(
+        { postpeerMetricsBudget: 0, rssRetryDelayMs: 0 },
+        rssFetch,
+        noScope,
+      );
+      const inFeed = await rssCollector({ ...ytEvent, platformId: "AAAAAAAAAAA" });
+      assert.equal(inFeed.metrics.views, 1234);
+      assert.equal(inFeed.metrics.likes, null);
+      assert.equal(inFeed.metrics.comments, null);
+      assert.equal(inFeed.state, "published");
+      assert.equal(inFeed.publishedAt, "2026-10-01T10:00:00+00:00");
+      assert.ok(inFeed.issues.includes("views_source:rss"));
+      assert.ok(inFeed.issues.includes(NEEDS_YT_SCOPE));
+      const noStats = await rssCollector({ ...ytEvent, platformId: "BBBBBBBBBBB" });
+      assert.equal(noStats.metrics.views, null);
+      assert.ok(noStats.issues.includes("rss_statistics_missing"));
+      const old = await rssCollector({ ...ytEvent, platformId: "OLDOLDOLD11" });
+      assert.equal(old.metrics.views, null);
+      assert.equal(old.state, "unknown");
+      assert.deepEqual(old.issues, [NEEDS_YT_SCOPE, "views_source:rss_not_in_feed"]);
+      assert.equal(
+        calls.filter((c) => c.includes("/feeds/")).length,
+        1,
+        "feed koşu başına bir kez çekilir",
+      );
+
+      // Kimlik dosyası hiç yok (varsayılan üretici scripts/token.json arar) → yine RSS.
+      const noCreds = await createCollector(
+        { postpeerMetricsBudget: 0, rssRetryDelayMs: 0 },
+        rssFetch,
+        async () => {
+          throw new ApiReadError("youtube_credentials_missing");
+        },
+      )({ ...ytEvent, platformId: "AAAAAAAAAAA" });
+      assert.equal(noCreds.metrics.views, 1234);
+
+      // Yedek YALNIZ yetki/kimlik hatasında seçilir: kota, yeniden-yetki ve başarılı OAuth'ta ağ yok.
+      calls.length = 0;
+      for (const failure of [
+        Object.assign(new Error("quota"), { code: 403, errors: [{ reason: "quotaExceeded" }] }),
+        new Error("invalid_grant"),
+        Object.assign(new Error("boom"), { code: 500 }),
+      ])
+        await assert.rejects(
+          createCollector({ postpeerMetricsBudget: 0, rssRetryDelayMs: 0 }, rssFetch, async () =>
+            ({ channels: { list: async () => { throw failure; } } }) as never,
+          )(ytEvent),
+          ApiReadError,
+        );
+      await okCollector(ytEvent);
+      assert.equal(calls.length, 0, "yetki hatası dışında RSS çağrılmaz");
+
+      // Ağ hatası → fırlatmaz; sorun kodu "rss_unavailable". Yeniden deneme: 2 deneme / istek.
+      let attempts = 0;
+      const dead = (async () => {
+        attempts++;
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch;
+      const down = await createCollector(
+        { postpeerMetricsBudget: 0, rssRetryDelayMs: 0 },
+        dead,
+        noScope,
+      )(ytEvent);
+      assert.deepEqual(down.issues, [NEEDS_YT_SCOPE, "rss_unavailable"]);
+      assert.equal(down.metrics.views, null);
+      assert.equal(attempts, 2, "tek yeniden deneme");
+      // Handle sayfası çözümlenemez / feed 404 / bozuk gövde: yine sessizce rss_unavailable.
+      for (const bad of [
+        async () => new Response("<html>kanal yok</html>"),
+        async () => new Response("yok", { status: 404 }),
+        async (url: string) =>
+          url.includes("/feeds/")
+            ? new Response("<html>not a feed</html>")
+            : new Response(`"channelId":"${CHANNEL}"`),
+      ])
+        assert.deepEqual(
+          (
+            await createCollector(
+              { postpeerMetricsBudget: 0, rssRetryDelayMs: 0 },
+              bad as unknown as typeof fetch,
+              noScope,
+            )(ytEvent)
+          ).issues,
+          [NEEDS_YT_SCOPE, "rss_unavailable"],
+        );
+      // 5xx bir kez yeniden denenir ve toparlanırsa kullanılır.
+      let flaky = 0;
+      const recovering = (async (url: string) => {
+        if (String(url).includes("/feeds/")) {
+          if (flaky++ === 0) return new Response("", { status: 503 });
+          return new Response(feedXml);
+        }
+        return new Response(`"channelId":"${CHANNEL}"`);
+      }) as unknown as typeof fetch;
+      const recovered = await createCollector(
+        { postpeerMetricsBudget: 0, rssRetryDelayMs: 0 },
+        recovering,
+        noScope,
+      )({ ...ytEvent, platformId: "AAAAAAAAAAA" });
+      assert.equal(recovered.metrics.views, 1234);
+    } finally {
+      for (const [key, value] of Object.entries({
+        ANALYTICS_DIR: savedRss.dir,
+        YT_CHANNEL_ID: savedRss.id,
+        YT_CHANNEL_HANDLE: savedRss.handle,
+      })) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      rmSync(rssDir, { recursive: true, force: true });
+    }
+
     // ── CLI uçtan uca: yetki/kimlik yok → snapshot'a sorun yazılır, çıkış kodu 0 ──
     const cliDir = mkdtempSync(join(tmpdir(), "pythia-analytics-cli-"));
     const cliLedger = join(cliDir, "ledger");
@@ -426,7 +626,7 @@ async function main() {
       [join(process.cwd(), "scripts", "analytics.ts"), "collect"],
       {
         cwd: cliDir, // scripts/token.json yok → youtube_credentials_missing
-        env: { ...process.env, ANALYTICS_DIR: cliLedger },
+        env: { ...process.env, ANALYTICS_DIR: cliLedger, YT_RSS_FALLBACK: "0" }, // ağsız, deterministik
         encoding: "utf8",
       },
     );
@@ -674,7 +874,7 @@ async function main() {
     assert.ok(report.includes("| 1 | 1 | 100 | 1 | 1000 |"));
     assert.ok(buildReport([]).includes("Henüz kayıt yok"));
     console.log(
-      "Analytics: journaling, retries, identity, provider states, partial metrics, credit budget, age-window reports, fail-soft scopes, public-repo archive, secret guard and unchanged-publish-path passed.",
+      "Analytics: journaling, retries, identity, provider states, partial metrics, credit budget, age-window reports, fail-soft scopes, YouTube RSS fallback, public-repo archive, secret guard and unchanged-publish-path passed.",
     );
   } finally {
     for (const [key, value] of Object.entries({
