@@ -1,0 +1,41 @@
+name: Instagram Token Kontrolü
+
+# Paylaşım YAPMADAN IG_ACCESS_TOKEN'ı test eder: hangi hesaba bağlı, izinleri
+# yeterli mi. Sonuç annotation olarak yazılır (log'a erişmeden okunabilsin).
+# Token ASLA basılmaz; Meta hata gövdeleri token içermez.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: /me + insights izni testi
+        env:
+          T: ${{ secrets.IG_ACCESS_TOKEN }}
+          EXPECTED: ${{ secrets.IG_USER_ID }}
+        run: |
+          set -u
+          T="$(printf '%s' "$T" | tr -d '\r\n\357\273\277' | xargs)"
+          echo "::add-mask::$T"
+          if [ -z "$T" ]; then echo "::error::IG_ACCESS_TOKEN boş"; exit 1; fi
+          echo "::notice::token uzunluğu=${#T} başlangıç=${T:0:4}…"
+          ME=$(curl -sS "https://graph.instagram.com/me?fields=user_id,username,account_type&access_token=$T")
+          ERR=$(echo "$ME" | jq -c '.error // empty')
+          if [ -n "$ERR" ]; then echo "::error::/me hatası: $ERR"; exit 1; fi
+          UID_=$(echo "$ME" | jq -r '.user_id // .id')
+          echo "::notice::/me OK → @$(echo "$ME" | jq -r .username) user_id=$UID_ tip=$(echo "$ME" | jq -r .account_type)"
+          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$UID_" ]; then
+            echo "::warning::IG_USER_ID secret'ı ($EXPECTED) token hesabıyla ($UID_) eşleşmiyor"
+          fi
+          MID=$(curl -sS "https://graph.instagram.com/me/media?fields=id&limit=1&access_token=$T" | jq -r '.data[0].id // empty')
+          if [ -n "$MID" ]; then
+            INS=$(curl -sS "https://graph.instagram.com/$MID/insights?metric=reach,views&access_token=$T")
+            IERR=$(echo "$INS" | jq -c '.error // empty')
+            if [ -n "$IERR" ]; then echo "::warning::insights izni yok/hata: $IERR"; else echo "::notice::insights OK"; fi
+          fi

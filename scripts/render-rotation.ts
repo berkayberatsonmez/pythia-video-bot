@@ -217,8 +217,23 @@ async function main() {
   if (uploadErrors.length > 0) {
     console.error(`\n💥 ${uploadErrors.length} yayın hatası:`);
     for (const msg of uploadErrors) console.error(`   • ${msg}`);
+    // Actions annotation olarak da bas: log'a erişmeden (API: check-runs/annotations)
+    // hatanın sebebi okunabilsin. Platform hata gövdeleri token içermez; yine de
+    // bilinen sırlar maskelenir ve tek satıra indirilir.
+    for (const msg of uploadErrors) console.log(`::error::${redactForAnnotation(msg)}`);
     process.exit(1);
   }
+}
+
+/** Annotation için: sırları maskele, satır sonlarını kaldır, uzunluğu sınırla. */
+function redactForAnnotation(s: string): string {
+  let out = String(s);
+  for (const k of ["IG_ACCESS_TOKEN", "POSTPEER_API_KEY", "TIKTOK_CLIENT_SECRET", "GH_TOKEN"]) {
+    const v = (process.env[k] || "").trim();
+    if (v.length >= 8) out = out.split(v).join("***");
+  }
+  out = out.replace(/access_token=[^&\s"]+/gi, "access_token=***");
+  return out.replace(/[\r\n]+/g, " ").slice(0, 600);
 }
 
 main().catch((e) => {
