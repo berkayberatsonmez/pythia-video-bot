@@ -56,6 +56,9 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           POSTPEER_API_KEY: ${{ secrets.POSTPEER_API_KEY }}
           POSTPEER_METRICS_BUDGET: ${{ inputs.postpeer_metrics_budget || 0 }}
+          # YouTube OAuth'ta youtube.readonly yoksa herkese açık RSS'ten izlenme okunur (boşsa handle'dan çözülür)
+          YT_CHANNEL_ID: ${{ vars.YT_CHANNEL_ID }}
+          YT_CHANNEL_HANDLE: ${{ vars.YT_CHANNEL_HANDLE }}
         run: npm run analytics:collect
       - name: Raporu ve yeni ölçümleri sakla
         if: always()
