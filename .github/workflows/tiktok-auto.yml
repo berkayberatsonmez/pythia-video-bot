@@ -41,6 +41,7 @@ jobs:
           sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
 
       - name: Bağımlılıkları kur
+        id: deps
         run: npm ci
 
       - name: Remotion tarayıcısını hazırla
@@ -91,6 +92,10 @@ jobs:
           POSTPEER_API_KEY: ${{ secrets.POSTPEER_API_KEY }}
           POSTPEER_ACCOUNT_ID: ${{ secrets.POSTPEER_ACCOUNT_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Yayın günlüğü (scripts/record-postpeer.ts) için içerik kimliği
+          PP_CATEGORY: ${{ steps.pick.outputs.category }}
+          PP_ID: ${{ steps.pick.outputs.id }}
+          PP_SLOT: morning
         run: |
           set -euo pipefail
           TAG="${{ steps.pack.outputs.tag }}"
@@ -102,10 +107,12 @@ jobs:
           # ── DEDUP GUARD (Worker KV yerine Release marker; tag=gün → çift-post kes) ──
           if gh release view "$TAG" --repo "$REPO" --json assets \
                -q '.assets[].name' | grep -qx 'posted.tiktok.marker'; then
+            npx tsx scripts/record-postpeer.ts skip || true   # günlük: asla yayını bozmaz
             echo "✓ dedup: $TAG zaten postlanmış (marker var) — atla."; exit 0
           fi
 
           post_once () {   # $1 = draft(true|false) → stdout: HTTP kodu; gövde /tmp/pp.json, başlık /tmp/pp.head
+            npx tsx scripts/record-postpeer.ts start >&2 || true   # günlük: istek öncesi niyet (stdout = HTTP kodu, o yüzden >&2)
             jq -n --arg c "$CAPTION" --arg u "$VIDEO_URL" \
                   --arg a "$POSTPEER_ACCOUNT_ID" --argjson d "$1" \
               '{content:$c, mediaItems:[{url:$u,type:"video"}],
@@ -113,11 +120,14 @@ jobs:
                             platformSpecificData:{draft:$d}}]}' > /tmp/pp.body.json
             # Ağ hatasında curl 000 yazar ama non-zero döner → set -e'yi tetiklemesin
             # ('|| true' ile fonksiyon 0 döner, döngü 000'ı görüp retry eder).
-            curl -sS -o /tmp/pp.json -D /tmp/pp.head -w "%{http_code}" \
+            local CODE
+            CODE=$(curl -sS -o /tmp/pp.json -D /tmp/pp.head -w "%{http_code}" \
               -X POST "https://api.postpeer.dev/v1/posts" \
               -H "Content-Type: application/json" \
               -H "x-access-key: $POSTPEER_API_KEY" \
-              --data @/tmp/pp.body.json || true
+              --data @/tmp/pp.body.json || true)
+            npx tsx scripts/record-postpeer.ts result "$CODE" "$1" >&2 || true   # günlük: sonuç
+            printf '%s' "$CODE"
           }
 
           log_rate () {  # Yanıt yalnız DAKİKALIK istek limitini döndürüyor (aylık kredi YOK) → onu logla
@@ -164,3 +174,22 @@ jobs:
           else
             echo "✓ TikTok'a gönderildi (PostPeer) + marker yazıldı."
           fi
+
+      - name: Yayın kayıtlarını artifact olarak sakla
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-journal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/analytics/events.jsonl
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # Public depoya arşiv (bilinçli — bkz. scripts/analytics/archive.ts): yalnız public
+      # post ID/URL + sayaçlar. Hata YAYINI/job'ı asla kırmaz (push zaten hata yutar).
+      - name: Yayın kayıtlarını arşivle (video-observability release)
+        if: always() && steps.deps.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run analytics:push || echo "::warning::analytics arşivi atlandı"

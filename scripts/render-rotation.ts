@@ -150,7 +150,10 @@ async function main() {
       try {
         // Zamanlı mod: slot saatinde otomatik public. Hemen mod: PRIVACY ile şimdi.
         const publishAt = UPLOAD_NOW ? undefined : slotPublishAt(v.slot);
-        await uploadVideoFile(auth, path, v.category, v.id, PRIVACY, publishAt);
+        await uploadVideoFile(auth, path, v.category, v.id, PRIVACY, publishAt, {
+          slot: v.slot,
+          format: v.poolKey,
+        });
       } catch (e) {
         console.error(`❌ Upload başarısız (${v.label} ${v.id}):`, e);
         uploadErrors.push(`YouTube ${v.label} ${v.id}: ${e instanceof Error ? e.message : e}`);
@@ -174,7 +177,10 @@ async function main() {
     console.log(`\n📸 Instagram Reels'e yükleniyor (anında yayın)...`);
     for (const { v, path } of rendered) {
       try {
-        const mediaId = await postReelFromFile(path, v.category, v.id, "reels");
+        const mediaId = await postReelFromFile(path, v.category, v.id, "reels", {
+          slot: v.slot,
+          format: v.poolKey,
+        });
         if (mediaId === "skipped") {
           console.log(`   ⏭️ ${v.label} → atlandı (mükerrer koruması)`);
         } else {

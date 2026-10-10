@@ -13,6 +13,8 @@
 import { spawnSync } from "node:child_process";
 import { basename } from "node:path";
 import { buildInstagramCaption, buildFirstComment } from "./metadata";
+import { trackPublication } from "./analytics/ledger";
+import { publicationContent, type ContentContext } from "./analytics/content";
 
 // graph.instagram.com sürümsüz çalışıyor (Instagram Login API) — deprecation derdi yok
 const IG_BASE = "https://graph.instagram.com";
@@ -164,8 +166,9 @@ export async function publishReel(
   return published.id;
 }
 
-// ─── Yüksek seviye: hosting + caption + publish + temizlik ────────────────
-export async function postReelFromFile(
+// ─── Yüksek seviye: hosting + caption + publish ───────────────────────────
+// Gönderim mantığı: yayın günlüğünden ÖNCEKİ halinden DEĞİŞMEDİ.
+async function sendReelFromFile(
   videoPath: string,
   category: string,
   id: string,
@@ -185,6 +188,40 @@ export async function postReelFromFile(
   const mediaId = await publishReel(url, caption, COVER_OFFSET_MS[category]);
   // Asset'i SİLMİYORUZ — TikTok'a elle yüklemek için Releases'te kalsın
   console.log(`   💾 TikTok için indir: ${url}`);
+
+  return mediaId;
+}
+
+/**
+ * Reels yayını + yayın günlüğü + ilk yorum. Davranış öncekiyle AYNI: aynı dönüş
+ * ("skipped" ya da media ID), aynı hata (yeniden fırlatılır). Günlük yazım
+ * hataları yutulur (ledger.trackPublication). Medya ID'si, ilk yorum isteği
+ * patlayabilsin/takılabilsin diye YORUMDAN ÖNCE kaydedilir.
+ */
+export async function postReelFromFile(
+  videoPath: string,
+  category: string,
+  id: string,
+  tag: string,
+  context: ContentContext = {},
+): Promise<string> {
+  const mediaId = await trackPublication(
+    {
+      platform: "instagram",
+      provider: "instagram",
+      content: publicationContent("instagram", category, id, context),
+    },
+    () => sendReelFromFile(videoPath, category, id, tag),
+    (result) =>
+      result === "skipped"
+        ? { state: "skipped", issues: ["duplicate"] }
+        : {
+            state: "published",
+            platformId: result,
+            publishedAt: new Date().toISOString(),
+          },
+  );
+  if (mediaId === "skipped") return mediaId;
 
   // İlk yorumu otomatik bırak (etkileşim) — hata olsa da yayını bozma
   try {

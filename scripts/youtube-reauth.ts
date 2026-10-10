@@ -16,7 +16,13 @@ import { spawnSync } from "node:child_process";
 import { google } from "googleapis";
 
 const REPO = "berkayberatsonmez/pythia-video-bot";
-const SCOPES = ["https://www.googleapis.com/auth/youtube.upload"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/youtube.upload",
+  // Yayın analitiği videos.list / channels.list?mine çağırır — upload scope'uyla
+  // YETMEZ, readonly gerekir. Upload yetkisine dokunmaz; yalnız okuma açar.
+  // Bu scope'suz analytics koşusu "needs_scope:youtube.readonly" yazıp devam eder.
+  "https://www.googleapis.com/auth/youtube.readonly",
+];
 const CREDS = join(process.cwd(), "scripts", "credentials.json");
 const TOKEN = join(process.cwd(), "scripts", "token.json");
 

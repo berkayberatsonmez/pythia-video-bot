@@ -43,7 +43,13 @@
     "reply:comments": "tsx scripts/reply-comments.ts",
     "reply:dry": "tsx scripts/reply-comments.ts --dry",
     "reply:debug": "tsx scripts/reply-comments.ts --dry --debug",
-    "ig:reauth": "tsx scripts/instagram-reauth.ts"
+    "ig:reauth": "tsx scripts/instagram-reauth.ts",
+    "yt:reauth": "tsx scripts/youtube-reauth.ts",
+    "verify:analytics": "tsx scripts/verify-analytics.ts",
+    "analytics:pull": "tsx scripts/analytics.ts pull",
+    "analytics:collect": "tsx scripts/analytics.ts collect",
+    "analytics:report": "tsx scripts/analytics.ts report",
+    "analytics:push": "tsx scripts/analytics.ts push"
   },
   "sideEffects": [
     "*.css"
