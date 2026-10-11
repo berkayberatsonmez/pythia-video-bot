@@ -1,0 +1,37 @@
+name: YouTube RSS Kontrolü
+
+# Analitiğin RSS yedeğini teşhis eder: handle → kanal ID, akıştaki videolar.
+# Sonuç annotation olarak yazılır. Paylaşım yapmaz, sır kullanmaz.
+
+on:
+  workflow_dispatch:
+    inputs:
+      handle:
+        default: "@Pythiamystic"
+      video:
+        description: "Akışta aranacak video ID (opsiyonel)"
+        default: ""
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+          H=$(curl -sSL -A "$UA" -H "Accept-Language: en" "https://www.youtube.com/${{ inputs.handle }}")
+          CANON=$(echo "$H" | grep -oE '<link rel="canonical" href="[^"]+"' | head -1)
+          EXT=$(echo "$H" | grep -oE '"externalId":"UC[A-Za-z0-9_-]{22}"' | head -1)
+          FIRST=$(echo "$H" | grep -oE '"channelId":"UC[A-Za-z0-9_-]{22}"' | head -1)
+          TITLE=$(echo "$H" | grep -oE '<meta property="og:title" content="[^"]+"' | head -1)
+          echo "::notice::canonical=$CANON | externalId=$EXT | firstChannelId=$FIRST | $TITLE | html=${#H}"
+          ID=$(echo "$EXT" | grep -oE 'UC[A-Za-z0-9_-]{22}' || echo "$CANON" | grep -oE 'UC[A-Za-z0-9_-]{22}')
+          [ -z "$ID" ] && { echo "::error::kanal ID bulunamadı"; exit 1; }
+          F=$(curl -sSL -A "$UA" "https://www.youtube.com/feeds/videos.xml?channel_id=$ID")
+          N=$(echo "$F" | grep -c "<entry>")
+          IDS=$(echo "$F" | grep -oE '<yt:videoId>[^<]+' | sed 's/<yt:videoId>//' | head -15 | tr '\n' ' ')
+          VIEWS=$(echo "$F" | grep -oE 'views="[0-9]+"' | head -5 | tr '\n' ' ')
+          echo "::notice::kanal=$ID akış_entry=$N http_len=${#F} | ids: $IDS | views: $VIEWS"
+          if [ -n "${{ inputs.video }}" ]; then
+            echo "$F" | grep -q "${{ inputs.video }}" && echo "::notice::${{ inputs.video }} AKIŞTA" || echo "::warning::${{ inputs.video }} akışta YOK"
+          fi
