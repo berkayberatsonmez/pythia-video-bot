@@ -11,7 +11,7 @@ import type { NumberContent } from "./data/numbers";
 import {
   GOLD,
   BG_GRADIENT,
-  StarField,
+  ThemedBackdrop,
   BackgroundMusic,
   MeaningCard,
   Question,
@@ -186,7 +186,7 @@ export const NumberVideo: React.FC<NumberVideoProps> = ({
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
-      <StarField />
+      <ThemedBackdrop />
       {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 

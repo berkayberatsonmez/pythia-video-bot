@@ -2,6 +2,7 @@ import React from "react";
 import {
   AbsoluteFill,
   Audio,
+  getInputProps,
   Img,
   interpolate,
   spring,
@@ -16,6 +17,26 @@ export const BG_GRADIENT =
   "linear-gradient(180deg, #09071A 0%, #1a0a2e 50%, #2a1845 100%)";
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Tema (görsel çeşitlilik) — render-rotation `theme` prop'unu (0-3) geçirir;
+// scripts/variety.ts gün+slottan deterministik seçer. Prop verilmezse 0 =
+// eski StarField görünümü (Studio önizleme ve TikTok yolu değişmez).
+// getInputProps: tüm kompozisyon sarmalayıcılarına tek tek prop taşımamak için.
+// ═══════════════════════════════════════════════════════════════════════════
+export const THEME_COUNT = 4;
+const MUSIC_START_SEC = [0, 38, 76, 114];
+const MUSIC_RATE = [1, 0.97, 1.03, 0.99];
+export function useThemeIndex(): number {
+  let t = 0;
+  try {
+    const v = Number((getInputProps() as { theme?: unknown }).theme);
+    if (Number.isInteger(v) && v >= 0 && v < THEME_COUNT) t = v;
+  } catch {
+    /* Studio dışı/boş girdi → 0 */
+  }
+  return t;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // BackgroundMusic — telifsiz mistik müzik (tüm videolarda ortak)
 // Başta fade-in, sonda fade-out. public/music.mp3
 // ═══════════════════════════════════════════════════════════════════════════
@@ -23,9 +44,15 @@ export const BackgroundMusic: React.FC<{ maxVolume?: number }> = ({
   maxVolume = 0.45,
 }) => {
   const { durationInFrames, fps } = useVideoConfig();
+  // Tek parça var → hafif çeşitleme: temaya göre BAŞLANGIÇ ofseti (+ hafif hız).
+  // Ofsetler parçanın (174 sn) içinde kalır: en uzun video ~45 sn → 114+50 < 174.
+  const t = useThemeIndex();
+  const startSec = MUSIC_START_SEC[t];
   return (
     <Audio
       src={staticFile("music.mp3")}
+      trimBefore={Math.round(startSec * fps)}
+      playbackRate={MUSIC_RATE[t]}
       volume={(f) =>
         interpolate(
           f,
@@ -101,6 +128,125 @@ export const StarField: React.FC = () => {
       })}
     </AbsoluteFill>
   );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ThemedBackdrop — 4 deterministik arka plan teması (StarField'in yerine)
+//   0 yıldız alanı (eski)      1 nebula gradyanı (sürüklenen renkli bulutlar)
+//   2 minimal koyu + film greni 3 takımyıldız çizgileri
+// Yalnız ZEMİN değişir; kart/yazı renkleri aynı kalır (marka tutarlı).
+// ═══════════════════════════════════════════════════════════════════════════
+const Nebula: React.FC = () => {
+  const frame = useCurrentFrame();
+  const blobs = [
+    { x: 25, y: 22, c: "rgba(168,85,247,0.38)", r: 62, s: 0.011 },
+    { x: 78, y: 48, c: "rgba(56,189,248,0.24)", r: 58, s: 0.008 },
+    { x: 38, y: 82, c: "rgba(236,72,153,0.26)", r: 66, s: 0.013 },
+  ];
+  return (
+    <AbsoluteFill style={{ background: "linear-gradient(180deg, #070518 0%, #120a2c 100%)" }}>
+      {blobs.map((b, i) => (
+        <AbsoluteFill
+          key={i}
+          style={{
+            background: `radial-gradient(circle at ${b.x + Math.sin(frame * b.s + i) * 9}% ${
+              b.y + Math.cos(frame * b.s * 1.3 + i) * 7
+            }%, ${b.c} 0%, rgba(0,0,0,0) ${b.r}%)`,
+          }}
+        />
+      ))}
+      {Array.from({ length: 36 }, (_, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${(i * 211) % 100}%`,
+            top: `${(i * 97) % 100}%`,
+            width: 2,
+            height: 2,
+            borderRadius: 2,
+            background: "#fff",
+            opacity: 0.25 + 0.35 * Math.abs(Math.sin((frame + i * 17) * 0.04)),
+          }}
+        />
+      ))}
+    </AbsoluteFill>
+  );
+};
+
+const GrainMinimal: React.FC = () => {
+  const frame = useCurrentFrame();
+  // feTurbulence tohumu birkaç karede bir değişir → canlı ama sakin gren
+  const seed = Math.floor(frame / 3) % 24;
+  return (
+    <AbsoluteFill style={{ background: "radial-gradient(circle at 50% 40%, #15101f 0%, #07050c 70%)" }}>
+      <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, opacity: 0.07, mixBlendMode: "screen" }}>
+        <filter id="pythia-grain">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed={seed} stitchTiles="stitch" />
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#pythia-grain)" />
+      </svg>
+    </AbsoluteFill>
+  );
+};
+
+const CONSTELLATION_PTS: [number, number][] = [
+  [12, 14], [30, 9], [48, 18], [64, 8], [86, 16],
+  [20, 36], [42, 42], [70, 34], [90, 46],
+  [10, 62], [34, 70], [58, 60], [80, 72],
+  [22, 88], [50, 84], [76, 92],
+];
+const CONSTELLATION_LINES: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [2, 6], [5, 6], [6, 7], [7, 8],
+  [5, 9], [9, 10], [10, 11], [11, 7], [11, 12], [10, 13], [13, 14], [14, 15], [12, 15],
+];
+const Constellation: React.FC = () => {
+  const frame = useCurrentFrame();
+  return (
+    <AbsoluteFill style={{ background: "linear-gradient(180deg, #050a1c 0%, #0b1530 55%, #16103a 100%)" }}>
+      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+        {CONSTELLATION_LINES.map(([a, b], i) => (
+          <line
+            key={i}
+            x1={CONSTELLATION_PTS[a][0]}
+            y1={CONSTELLATION_PTS[a][1]}
+            x2={CONSTELLATION_PTS[b][0]}
+            y2={CONSTELLATION_PTS[b][1]}
+            stroke="#9db4ff"
+            strokeWidth={0.12}
+            opacity={0.18 + 0.14 * Math.sin(frame * 0.03 + i)}
+          />
+        ))}
+      </svg>
+      {CONSTELLATION_PTS.map(([x, y], i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${x}%`,
+            top: `${y}%`,
+            width: 10,
+            height: 10,
+            marginLeft: -5,
+            marginTop: -5,
+            borderRadius: 5,
+            background: "#e8eeff",
+            boxShadow: "0 0 18px 4px rgba(157,180,255,0.7)",
+            opacity: 0.55 + 0.4 * Math.abs(Math.sin(frame * 0.04 + i * 2)),
+          }}
+        />
+      ))}
+    </AbsoluteFill>
+  );
+};
+
+export const ThemedBackdrop: React.FC<{ base?: React.ReactNode }> = ({ base }) => {
+  const t = useThemeIndex();
+  if (t === 1) return <Nebula />;
+  if (t === 2) return <GrainMinimal />;
+  if (t === 3) return <Constellation />;
+  return <>{base ?? <StarField />}</>;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
