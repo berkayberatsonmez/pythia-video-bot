@@ -3,7 +3,8 @@
 //
 // Tarih-tabanlı deterministik: state dosyası YOK → GitHub Actions'ta
 // her çalışma aynı/doğru sonucu verir. Round-robin ile kategoriler
-// karışık dizilir (peş peşe aynı kategori gelmez).
+// karışık dizilir (peş peşe aynı kategori gelmez → sabah ve akşam slotu
+// her zaman FARKLI kategoriden; bkz. verify-rotation.ts).
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { DREAM_SYMBOLS } from "../src/data/dream-symbols";
@@ -146,36 +147,85 @@ const POOL_WEIGHTS: Record<PoolKey, number> = {
   manifest: 1,
 };
 
-// Ağırlıklı round-robin: her turda her pooldan WEIGHT kadar eleman al →
-// popülerler daha sık çıkar ama hepsi sırayla, tekrarsız. Deterministik.
-function buildSequence(): SelectedVideo[] {
+// Ağırlıklı, KOMŞUSU FARKLI dizi. Günlük iki slot dizide yan yana iki eleman
+// (day*2, day*2+1) olduğundan, sabah ve akşamın FARKLI kategoriden çıkması için
+// dizide hiçbir iki komşu (dairesel, son→ilk dahil) aynı pooldan olmamalı.
+//
+// Her adımda, bir önceki elemanın poolu HARİÇ, "ağırlık × kalan oran"ı en
+// yüksek pool seçilir (eşitlikte POOL_ORDER). Ağırlığı 2 olan popüler poollar
+// ağırlığı 1 olanlardan önce/sık tüketilir; büyük pool (ör. compat) sona
+// yığılmaz çünkü oran poolun kendi boyuna göre ölçülür. Deterministik: Random
+// ve tarih yok. Tüm id'ler döngüde tam bir kez geçer.
+export function buildSequence(): SelectedVideo[] {
   const seq: SelectedVideo[] = [];
   const cursor: Record<string, number> = {};
   for (const k of POOL_ORDER) cursor[k] = 0;
   const total = POOL_ORDER.reduce((s, k) => s + POOLS[k].ids.length, 0);
+  const remainingScore = (k: PoolKey): number => {
+    const n = POOLS[k].ids.length;
+    return n === 0 ? 0 : (POOL_WEIGHTS[k] * (n - cursor[k])) / n;
+  };
+  // Kuyruğun sonu ilk elemanla da komşu (dairesel) → ilk poolu sona kadar
+  // yasaklama: son eleman ilk elemanın poolundan olamaz.
+  let first: PoolKey | null = null;
   while (seq.length < total) {
-    for (const k of POOL_ORDER) {
+    const prev = seq.length ? seq[seq.length - 1].poolKey : null;
+    const left = total - seq.length;
+    let best: PoolKey | null = null;
+    let bestScore = 0;
+    // Zorunlu seçim: bir poolun kalanı, kalan yuvaların yarısından fazlaysa
+    // (kalan*2 > left) komşu çakışması önlenemez hâle gelir → onu şimdi seç.
+    // Büyük poolun (compat) dizinin sonuna yığılmasını bu kural engeller.
+    const forced = POOL_ORDER.find(
+      (k) =>
+        k !== prev &&
+        (POOLS[k].ids.length - cursor[k]) * 2 > left &&
+        cursor[k] < POOLS[k].ids.length,
+    );
+    for (const k of forced ? [forced] : POOL_ORDER) {
       const pool = POOLS[k];
-      for (let w = 0; w < POOL_WEIGHTS[k]; w++) {
-        if (cursor[k] < pool.ids.length) {
-          seq.push({
-            slot: "morning", // slot sonradan atanır
-            poolKey: k,
-            label: pool.label,
-            comp: pool.comp,
-            category: pool.category,
-            propKey: pool.key,
-            id: pool.ids[cursor[k]],
-          });
-          cursor[k]++;
-        }
+      if (cursor[k] >= pool.ids.length || k === prev) continue;
+      // Son eleman: ilk elemanın poolunu seçme (dairesel komşuluk).
+      if (left === 1 && k === first) continue;
+      const sc = remainingScore(k);
+      if (sc > bestScore) {
+        best = k;
+        bestScore = sc;
       }
     }
+    // Uygulanabilir pool kalmadıysa (kalan hepsi aynı pool) komşu çakışmasını
+    // kabul et — verify-rotation bunu yakalar; mevcut veri boyutlarında olmaz.
+    if (best === null) {
+      best = POOL_ORDER.find((k) => cursor[k] < POOLS[k].ids.length)!;
+    }
+    const pool = POOLS[best];
+    seq.push({
+      slot: "morning", // slot sonradan atanır
+      poolKey: best,
+      label: pool.label,
+      comp: pool.comp,
+      category: pool.category,
+      propKey: pool.key,
+      id: pool.ids[cursor[best]],
+    });
+    cursor[best]++;
+    if (first === null) first = best;
   }
   return seq;
 }
 
 const SEQUENCE = buildSequence();
+
+// Tek seferlik geçiş kaydırması (2026-10-13). Dizi yeniden kurulunca hangi
+// id'nin hangi güne düştüğü değişti; hiçbir şey yapılmasaydı eski dizinin son
+// 30 günde yayınladığı id'lerin ~%33'ü (ilk haftada ~%50'si) tekrar çıkardı
+// (yayın tarafında 30 günlük bir mükerrer koruması yok; worker/dedup yalnız
+// 20 saatlik aynı-başlık penceresi). 0..188 arasında tüm kaydırmalar denendi:
+// 49, önümüzdeki 30 günde eski yayınlarla çakışmayı 20'den 5'e (60 slotta)
+// indiriyor. Komşuluk dairesel olduğundan kaydırma "farklı kategori"
+// değişmezini bozmaz. Değiştirme: yeni kaydırma yayın geçmişini yeniden
+// tekrar ettirir.
+const SEQUENCE_OFFSET = 49;
 
 // Gün numarası — epoch'tan bu yana gün sayısı (UTC)
 function dayNumber(): number {
@@ -187,11 +237,18 @@ function dayNumber(): number {
  * Tamamen stateless & deterministik — aynı gün her çağrıda aynı sonuç.
  */
 export function getTodaysVideos(): SelectedVideo[] {
-  const day = dayNumber();
-  const len = SEQUENCE.length;
-  const morning = { ...SEQUENCE[(day * 2) % len], slot: "morning" as const };
+  return getVideosForDay(dayNumber());
+}
+
+/** Verilen gün numarası (epoch'tan bu yana UTC gün) için sabah+akşam. */
+export function getVideosForDay(
+  day: number,
+  sequence: SelectedVideo[] = SEQUENCE,
+): SelectedVideo[] {
+  const len = sequence.length;
+  const morning = { ...sequence[(day * 2 + SEQUENCE_OFFSET) % len], slot: "morning" as const };
   const evening = {
-    ...SEQUENCE[(day * 2 + 1) % len],
+    ...sequence[(day * 2 + 1 + SEQUENCE_OFFSET) % len],
     slot: "evening" as const,
   };
   return [morning, evening];

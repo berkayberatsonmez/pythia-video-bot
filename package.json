@@ -32,6 +32,7 @@
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc",
     "video": "tsx scripts/render-one.ts",
+    "verify:rotation": "tsx scripts/verify-rotation.ts",
     "rotation:preview": "tsx scripts/rotation.ts --preview",
     "rotation": "tsx scripts/render-rotation.ts",
     "rotation:test": "tsx scripts/render-rotation.ts --upload --now --privacy unlisted",
