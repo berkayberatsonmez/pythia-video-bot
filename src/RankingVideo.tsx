@@ -64,10 +64,13 @@ const Hook: React.FC<{ trait: string; durFrames?: number }> = ({
   const { fps } = useVideoConfig();
   const d = durFrames ?? 2.5 * fps;
   const drift = Math.sin(frame * 0.04) * 8;
-  const opacity = interpolate(frame, [0, 0.4 * fps, d - 0.45 * fps, d], [0, 1, 1, 0], {
+  const opacity = interpolate(frame, [0, d - 0.45 * fps, d], [1, 1, 0], {
     extrapolateRight: "clamp",
   });
-  const scale = spring({
+  // Frame 0'da kanca metni TAM görünür (kapak karesi): opaklık solması yok,
+  // yay yalnız 0.85 → 1 "pop" yapar.
+  const scale =
+    0.85 + 0.15 * spring({
     frame,
     fps,
     config: { damping: 12, stiffness: 100 },
