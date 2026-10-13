@@ -97,15 +97,15 @@ export function buildReport(
     "",
     "## Son durumlar",
     "",
-    "| İçerik / platform | Durum | Platform / aracı ID | Son kontrol | Görüntüleme | Beğeni | Yorum | Paylaşım | Kayıt | Erişim | Sorun / not |",
-    "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    "| İçerik / platform | Durum | Platform / aracı ID | Son kontrol | Görüntüleme | Beğeni | Yorum | Paylaşım | Kayıt | Erişim | Ort. izlenme (sn) | Toplam etkileşim | Sorun / not |",
+    "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
   );
   for (const { p, latest } of rows) {
     const m = latest.metrics;
     const state =
       latest.state === "started" ? "unknown (yanıt kaydı yok)" : latest.state;
     lines.push(
-      `| ${cell(p.content.contentId)} / ${p.platform} | ${state} | ${cell(latest.platformId || p.platformId || p.providerId)} | ${latest.kind === "snapshot" ? latest.at : "henüz sorgulanmadı"} | ${cell(m?.views)} | ${cell(m?.likes)} | ${cell(m?.comments)} | ${cell(m?.shares)} | ${cell(m?.saves)} | ${cell(m?.reach)} | ${cell(latest.issues?.join(", "))} |`,
+      `| ${cell(p.content.contentId)} / ${p.platform} | ${state} | ${cell(latest.platformId || p.platformId || p.providerId)} | ${latest.kind === "snapshot" ? latest.at : "henüz sorgulanmadı"} | ${cell(m?.views)} | ${cell(m?.likes)} | ${cell(m?.comments)} | ${cell(m?.shares)} | ${cell(m?.saves)} | ${cell(m?.reach)} | ${cell(typeof m?.avgWatchTimeMs === "number" ? Math.round(m.avgWatchTimeMs / 100) / 10 : null)} | ${cell(m?.totalInteractions)} | ${cell(latest.issues?.join(", "))} |`,
     );
   }
   lines.push(

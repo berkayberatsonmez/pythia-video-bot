@@ -329,6 +329,50 @@ async function main() {
           : new Response(JSON.stringify({ id: "ig1" }))) as typeof fetch,
     )(igEvent);
     assert.deepEqual(ig429.issues, ["instagram_insights_http_429"]);
+    // İzlenme süresi metrikleri: HER BİRİ AYRI çağrı; biri desteklenmezse (400) diğerleri ve
+    // temel metrikler snapshot'ta kalır, yalnız o metrik null + sorun kodu.
+    const watchCalls: string[] = [];
+    const igWatch = await createCollector(
+      { postpeerMetricsBudget: 0 },
+      (async (url: string | URL | Request) => {
+        const u = String(url);
+        if (!u.includes("/insights?"))
+          return new Response(JSON.stringify({ id: "ig1", like_count: 3 }));
+        const metric = new URL(u).searchParams.get("metric")!;
+        watchCalls.push(metric);
+        if (metric === "ig_reels_video_view_total_time")
+          return new Response(JSON.stringify({ error: { code: 100 } }), { status: 400 });
+        const value: Record<string, number> = {
+          "views,reach,shares,saved": 0,
+          ig_reels_avg_watch_time: 4210,
+          total_interactions: 17,
+        };
+        const rows =
+          metric === "views,reach,shares,saved"
+            ? [
+                { name: "views", values: [{ value: 120 }] },
+                { name: "reach", values: [{ value: 90 }] },
+                { name: "shares", values: [{ value: 4 }] },
+                { name: "saved", values: [{ value: 5 }] },
+              ]
+            : [{ name: metric, values: [{ value: value[metric] }] }];
+        return new Response(JSON.stringify({ data: rows }));
+      }) as typeof fetch,
+    )(igEvent);
+    assert.deepEqual(watchCalls, [
+      "views,reach,shares,saved",
+      "ig_reels_avg_watch_time",
+      "ig_reels_video_view_total_time",
+      "total_interactions",
+    ]);
+    assert.equal(igWatch.metrics.views, 120);
+    assert.equal(igWatch.metrics.saves, 5);
+    assert.equal(igWatch.metrics.avgWatchTimeMs, 4210);
+    assert.equal(igWatch.metrics.totalInteractions, 17);
+    assert.equal(igWatch.metrics.totalWatchTimeMs, undefined, "desteklenmeyen metrik null/undefined, snapshot düşmez");
+    assert.deepEqual(igWatch.issues, ["instagram_ig_reels_video_view_total_time_http_400"]);
+    // Eski şema: ek alan yok → emptyMetrics aynı kalır (okuyucular etkilenmez).
+    assert.ok(!("avgWatchTimeMs" in emptyMetrics()));
     await assert.rejects(
       getJson(
         "https://example.invalid",
