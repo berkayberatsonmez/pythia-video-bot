@@ -8,6 +8,7 @@
   "dependencies": {
     "@remotion/cli": "4.0.473",
     "@remotion/tailwind-v4": "4.0.473",
+    "astronomy-engine": "^2.1.19",
     "msedge-tts": "^2.0.6",
     "music-metadata": "^11.13.0",
     "react": "19.2.3",
@@ -33,6 +34,8 @@
     "lint": "eslint src && tsc",
     "video": "tsx scripts/render-one.ts",
     "verify:rotation": "tsx scripts/verify-rotation.ts",
+    "verify:sky": "tsx scripts/verify-sky.ts",
+    "sky:preview": "tsx scripts/sky-events.ts",
     "rotation:preview": "tsx scripts/rotation.ts --preview",
     "rotation": "tsx scripts/render-rotation.ts",
     "rotation:test": "tsx scripts/render-rotation.ts --upload --now --privacy unlisted",
