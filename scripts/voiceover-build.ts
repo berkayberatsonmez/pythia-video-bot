@@ -17,6 +17,7 @@ const KEYS = ["intro", "m1", "m2", "m3", "close"] as const;
 export async function buildVoiceover(
   category: string,
   id: string,
+  voice?: string,
 ): Promise<Voiceover | null> {
   const n = buildNarration(category, id);
   if (!n) return null;
@@ -24,7 +25,7 @@ export async function buildVoiceover(
   const out = {} as Voiceover;
   for (const key of KEYS) {
     const rel = `voiceover/${slug}/${key}.mp3`;
-    const dur = await synth(n[key], join("public", rel));
+    const dur = await synth(n[key], join("public", rel), voice);
     out[key] = { src: rel, dur, text: n[key] };
   }
   return out;

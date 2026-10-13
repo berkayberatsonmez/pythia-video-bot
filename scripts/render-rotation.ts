@@ -11,11 +11,13 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync, unlinkSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { getTodaysVideos, type SelectedVideo } from "./rotation";
+import { dayNumber, getTodaysVideos, type SelectedVideo } from "./rotation";
+import { themeFor, voiceFor } from "./variety";
 import { authorize, uploadVideoFile } from "./upload-youtube";
 import { postReelFromFile } from "./upload-instagram";
 import { postToTikTokFromFile } from "./upload-tiktok";
 import { buildVoiceover } from "./voiceover-build";
+import { TTS_VOICE } from "./tts";
 import type { Voiceover } from "../src/components/voiceover";
 
 const OUTPUT_DIR = join(process.cwd(), "out", "daily");
@@ -78,6 +80,7 @@ function renderOne(v: SelectedVideo, voiceover: Voiceover | null): string {
   const propsFile = join(tmpdir(), `pythia-rot-${Date.now()}-${v.slot}.json`);
   const props: Record<string, unknown> = { [v.propKey]: v.id };
   if (v.extraProps) Object.assign(props, v.extraProps);
+  props.theme = themeFor(dayNumber(), v.slot); // arka plan teması + müzik ofseti (shared.tsx)
   if (voiceover) props.voiceover = voiceover;
   writeFileSync(propsFile, JSON.stringify(props));
 
@@ -127,8 +130,17 @@ async function main() {
     // Seslendirme üret (başarısızsa sessiz fallback — videoyu bozma)
     let voiceover: Voiceover | null = null;
     try {
-      voiceover = await buildVoiceover(v.category, v.id);
-      if (voiceover) console.log(`   🎙 Seslendirme hazır (${v.category}/${v.id})`);
+      let voice: string = voiceFor(dayNumber(), v.slot);
+      try {
+        voiceover = await buildVoiceover(v.category, v.id, voice);
+      } catch (e) {
+        // Seçilen ses (ör. Ahmet) alınamazsa varsayılan sese düş — video sessiz kalmasın.
+        if (voice === TTS_VOICE) throw e;
+        console.error(`   ⚠️ ${voice} başarısız, ${TTS_VOICE} deneniyor:`, e instanceof Error ? e.message : e);
+        voice = TTS_VOICE;
+        voiceover = await buildVoiceover(v.category, v.id, voice);
+      }
+      if (voiceover) console.log(`   🎙 Seslendirme hazır (${v.category}/${v.id}, ${voice}, tema ${themeFor(dayNumber(), v.slot)})`);
     } catch (e) {
       console.error(
         `   ⚠️ Seslendirme atlandı (${v.category}/${v.id}):`,
