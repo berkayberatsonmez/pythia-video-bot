@@ -23,6 +23,8 @@ import { BehaviorVideo } from "./BehaviorVideo";
 import { ZODIAC_BEHAVIORS, getBehaviorById } from "./data/zodiac-behaviors";
 import { CompatibilityVideo } from "./CompatibilityVideo";
 import { ZODIAC_COMPATIBILITY, getCompatibilityById } from "./data/zodiac-compatibility";
+import { SkyEvent } from "./SkyEvent";
+import { SKY_SAMPLE } from "./data/sky-sample";
 
 // ─── Wrapper — symbolId → full symbol lookup ────────────────────────────
 const DreamSymbolWrapper: React.FC<{
@@ -236,6 +238,23 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ compatId: "akrep-boga" }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.voiceover
+            ? voiceoverTotalFrames(props.voiceover, 30)
+            : 15 * 30,
+        })}
+      />
+
+      {/* ═══ GÖK GÜNDEMİ — retro / Dolunay / Yeniay / tutulma ═══════ */}
+      {/* Kart scripts/sky-events.ts'te üretilir (render-rotation `sky` prop'u geçer) */}
+      <Composition
+        id="SkyEvent"
+        component={SkyEvent}
+        durationInFrames={15 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ sky: SKY_SAMPLE }}
         calculateMetadata={({ props }) => ({
           durationInFrames: props.voiceover
             ? voiceoverTotalFrames(props.voiceover, 30)

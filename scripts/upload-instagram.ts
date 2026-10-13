@@ -52,6 +52,7 @@ async function igGet(path: string, params: Record<string, string>): Promise<any>
 // ─── Kapak (cover) — videonun "reveal" anından kare seç (ms cinsinden) ────
 // IG thumb_offset: o milisaniyedeki kare profil grid + Reels sekmesi kapağı olur.
 const COVER_OFFSET_MS: Record<string, number> = {
+  sky: 600, // Gök Gündemi: kanca (gezegen + başlık + tarih) 0. karede tam görünür
   dream: 3800, // sembol ikonu + ismi belirir
   tarot: 4200, // kart oturur + ismi
   number: 3800, // büyük sayı + başlık

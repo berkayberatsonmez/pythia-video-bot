@@ -15,6 +15,7 @@ import { MANIFESTATIONS } from "../src/data/manifestation";
 import { ZODIAC_RANKINGS } from "../src/data/zodiac-rankings";
 import { ZODIAC_BEHAVIORS } from "../src/data/zodiac-behaviors";
 import { ZODIAC_COMPATIBILITY } from "../src/data/zodiac-compatibility";
+import { buildSkyCard, dateToDay, skyEventForDay } from "./sky-events";
 
 export type PoolKey =
   | "dream"
@@ -110,7 +111,9 @@ export const POOLS: Record<PoolKey, Pool> = {
 
 export type SelectedVideo = {
   slot: "morning" | "evening";
-  poolKey: PoolKey;
+  poolKey: PoolKey | "sky";
+  /** Render'a ek prop (Gök Gündemi: tam `sky` kartı). */
+  extraProps?: Record<string, unknown>;
   label: string;
   comp: string;
   category: string;
@@ -240,17 +243,55 @@ export function getTodaysVideos(): SelectedVideo[] {
   return getVideosForDay(dayNumber());
 }
 
+// ─── Gök Gündemi (SkyEvent) — akşam slotu ────────────────────────────────
+// Gök olayı olan günün AKŞAM slotu SkyEvent videosu olur (sabah rotasyonda
+// kalır; olay seçimi/önceliği scripts/sky-events.ts). Yerinden edilen rotasyon
+// öğesi KAYBOLMAZ, KAYAR: o gün rotasyondan yalnız 1 öğe tüketilir, dizi
+// indeksi ertesi güne 1 eksik ilerler → atlanan akşam öğesi ertesi sabah olur.
+// Kayma yalnız SKY_ANCHOR_DAY'den (2026-10-13, devreye alma günü) itibaren
+// sayılır; öncesi eski formülle birebir aynı (geçmiş yayınlar etkilenmez, dizi
+// geriye gitmediği için geçmişte yayınlanan hiçbir öğe tekrar çıkmaz).
+// Komşuluk dairesel farklı olduğundan ardışık iki indeks hep farklı kategoridir:
+// "sabah ≠ akşam" ve "ertesi sabah ≠ dünkü sabah" değişmezleri kaymada da geçer.
+export const SKY_ANCHOR_DAY = dateToDay("2026-10-13");
+const shiftAt = new Map<number, number>([[SKY_ANCHOR_DAY, 0]]);
+let shiftFilled = SKY_ANCHOR_DAY;
+
+/** [SKY_ANCHOR_DAY, day) arasında akşamı SkyEvent'e giden gün sayısı (artımlı önbellek). */
+export function skyShiftBefore(day: number): number {
+  if (day <= SKY_ANCHOR_DAY) return 0;
+  while (shiftFilled < day) {
+    shiftAt.set(shiftFilled + 1, shiftAt.get(shiftFilled)! + (skyEventForDay(shiftFilled) ? 1 : 0));
+    shiftFilled++;
+  }
+  return shiftAt.get(day)!;
+}
+
 /** Verilen gün numarası (epoch'tan bu yana UTC gün) için sabah+akşam. */
 export function getVideosForDay(
   day: number,
   sequence: SelectedVideo[] = SEQUENCE,
+  withSky = true,
 ): SelectedVideo[] {
   const len = sequence.length;
-  const morning = { ...sequence[(day * 2 + SEQUENCE_OFFSET) % len], slot: "morning" as const };
-  const evening = {
-    ...sequence[(day * 2 + 1 + SEQUENCE_OFFSET) % len],
-    slot: "evening" as const,
-  };
+  const base = day * 2 + SEQUENCE_OFFSET - (withSky ? skyShiftBefore(day) : 0);
+  const morning = { ...sequence[base % len], slot: "morning" as const };
+  const ev = withSky ? skyEventForDay(day) : null;
+  if (ev) {
+    const card = buildSkyCard(ev);
+    const evening: SelectedVideo = {
+      slot: "evening",
+      poolKey: "sky",
+      label: "🌌 Gök Gündemi",
+      comp: "SkyEvent",
+      category: "sky",
+      propKey: "skyId",
+      id: ev.id,
+      extraProps: { sky: card },
+    };
+    return [morning, evening];
+  }
+  const evening = { ...sequence[(base + 1) % len], slot: "evening" as const };
   return [morning, evening];
 }
 

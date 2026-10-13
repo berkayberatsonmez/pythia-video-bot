@@ -18,6 +18,8 @@ import { getManifestById } from "../src/data/manifestation";
 import { getRankingById } from "../src/data/zodiac-rankings";
 import { getBehaviorById } from "../src/data/zodiac-behaviors";
 import { getCompatibilityById } from "../src/data/zodiac-compatibility";
+import { skyCardById } from "./sky-events";
+import type { SkyCard } from "../src/data/sky-types";
 
 export type VideoMeta = {
   title: string;
@@ -409,6 +411,61 @@ function compatMeta(id: string): VideoMeta | null {
   };
 }
 
+// ─── SKY (Gök Gündemi) ───────────────────────────────────────────────────
+// YouTube başlığı: tarih-only spam YOK; merak boşluğu + olay + burç.
+const SKY_TITLE: Record<SkyCard["kind"], (c: SkyCard) => string> = {
+  "retro-pre": (c) => `${c.planetName} Retrosu Yarın Başlıyor: ${c.signName} Burcunda Neler Hissedilebilir?`,
+  "retro-start": (c) => `${c.planetName} Retrosu Başladı: En Çok Hangi 3 Burç Hissedebilir?`,
+  "retro-mid": (c) => `${c.planetName} Retrosu Sürüyor: Bu Dönemde Neye Dikkat Etmekte Fayda Var?`,
+  "retro-end": (c) => `${c.planetName} Retrosu Bitiyor: Düz Harekete Geçerken Neler Değişebilir?`,
+  "full-moon": (c) => `${c.signName} Burcunda Dolunay: Bu Gece 3 Burç Daha Çok Hissedebilir`,
+  "new-moon": (c) => `${c.signName} Burcunda Yeniay: Niyet Koymak İçin Uygun mu?`,
+  "lunar-eclipse": (c) => `${c.signName} Burcunda Ay Tutulması: Astrolojide Ne Anlama Gelir?`,
+  "solar-eclipse": (c) => `${c.signName} Burcunda Güneş Tutulması: Yeni Sayfa Teması`,
+};
+
+function skyMeta(id: string): VideoMeta | null {
+  const c = skyCardById(id);
+  if (!c) return null;
+  const lines = c.affected.map((a) => `• ${a.signName}: ${a.line}`);
+  const tagWord = c.hashtags[0].replace(/^#/, "");
+  return {
+    title: clampTitle(`${SKY_TITLE[c.kind](c)} #shorts`),
+    description: [
+      c.hookLine,
+      "",
+      c.theme.desc,
+      "",
+      "En çok hissedebilecek 3 burç:",
+      ...lines,
+      "",
+      `💡 ${c.tip}`,
+      "",
+      "Senin burcun listede mi? Yorumlara yaz 👇",
+      ...PYTHIA_CTA,
+      c.hashtags.join(" "),
+      "",
+      DISCLAIMER,
+    ].join("\n"),
+    tags: clampTags([
+      tagWord,
+      `${c.planetName} retrosu`,
+      "astroloji",
+      "burçlar",
+      "burç yorumları",
+      "retro",
+      "gök olayları",
+      "dolunay",
+      "yeniay",
+      c.signName + " burcu",
+      "astrology",
+      "retrograde",
+      "Pythia",
+      "shorts",
+    ]),
+  };
+}
+
 // ─── Dispatcher ──────────────────────────────────────────────────────────
 export function buildMetadata(category: string, id: string): VideoMeta {
   let meta: VideoMeta | null = null;
@@ -436,6 +493,9 @@ export function buildMetadata(category: string, id: string): VideoMeta {
       break;
     case "compat":
       meta = compatMeta(id);
+      break;
+    case "sky":
+      meta = skyMeta(id);
       break;
   }
   if (!meta) {
@@ -627,6 +687,22 @@ export function buildInstagramCaption(category: string, id: string): string {
         hashtags: ["#burç", "#burçuyumu", "#astroloji", "#ilişki", "#pythia"],
       });
     }
+    case "sky": {
+      const c = skyCardById(id);
+      if (!c) break;
+      return igAssemble({
+        hook: `${c.hookLine} 🌌`,
+        body: [
+          c.theme.desc,
+          ...c.affected.map((a, i) => `${i + 1}️⃣ ${a.signName}\n${a.line}`),
+        ],
+        reflection: `💡 ${c.tip}`,
+        save: "Kaydet — bu dönemde dön bak",
+        share: "Burcu uyan birine gönder",
+        comment: "Senin burcun listede mi? Yorumlara yaz",
+        hashtags: c.hashtags,
+      });
+    }
   }
   throw new Error(`IG caption üretilemedi: ${category}/${id}`);
 }
@@ -666,6 +742,7 @@ export function buildFirstComment(category: string, id: string): string {
       return `${n1 && n2 ? n1 + " + " + n2 + " — siz misiniz?" : "Siz uyumlu musunuz?"} 👇 O kişiyi etiketle 😏`;
     }
   }
+  if (category === "sky") return "Burcunu yaz 👇 Bu dönem sende neler değişiyor? Hepsini okuyorum 🌌";
   return "Yorumun ne? 👇 Her yoruma bakıyorum 🤍";
 }
 
@@ -818,6 +895,17 @@ export function buildTikTokMetadata(category: string, id: string): TikTokMeta {
           ["#burçuyumu", "#astroloji", "#ilişki", z1?.hashtag],
         );
       }
+      break;
+    }
+    case "sky": {
+      const c = skyCardById(id);
+      if (c)
+        return ttAssemble(
+          c.hookLine,
+          `${c.affected[0].signName}, ${c.affected[1].signName} ve ${c.affected[2].signName} bunu daha çok hissedebilir.`,
+          "Senin burcun listede mi? 👇",
+          c.hashtags.slice(0, 4),
+        );
       break;
     }
   }

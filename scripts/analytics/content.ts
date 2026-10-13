@@ -25,6 +25,7 @@ export type ContentContext = Partial<
 
 /** (category, id) → havuz anahtarı. numerology/angel aynı "number" kategorisini paylaşır. */
 export function poolKeyFor(category: string, id: string): string {
+  if (category === "sky") return "sky";
   for (const [key, pool] of Object.entries(POOLS)) {
     if (pool.category === category && pool.ids.includes(id)) return key;
   }
