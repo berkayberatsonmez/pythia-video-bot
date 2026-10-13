@@ -103,6 +103,9 @@ export function instagramMetrics(payload: any, basic: any): Metrics {
     reach: "reach",
     shares: "shares",
     saved: "saves",
+    ig_reels_avg_watch_time: "avgWatchTimeMs",
+    ig_reels_video_view_total_time: "totalWatchTimeMs",
+    total_interactions: "totalInteractions",
   };
   for (const row of payload.data || []) {
     const key = names[row.name];
@@ -111,6 +114,15 @@ export function instagramMetrics(payload: any, basic: any): Metrics {
   }
   return metrics;
 }
+
+/** Temel insights çağrısından AYRI, metrik başına istenenler (biri desteklenmezse diğerleri/anlık görüntü düşmesin). */
+export const IG_EXTRA_METRICS = [
+  "ig_reels_avg_watch_time",
+  "ig_reels_video_view_total_time",
+  "total_interactions",
+] as const;
+
+const IG_STOP_EXTRAS = /^(http_429|http_5\d\d|network_or_timeout)$/;
 
 export function postpeerObservation(
   payload: any,
@@ -542,6 +554,28 @@ export function createCollector(
         result.issues.push(
           code.startsWith("needs_") ? code : `instagram_insights_${code}`,
         );
+        // İzin yok / hız sınırı / ağ-sunucu hatası: ek metrikler de aynı sebeple düşer → boşuna 3 çağrı yapma.
+        if (code.startsWith("needs_") || IG_STOP_EXTRAS.test(code)) return result;
+      }
+      // İzlenme süresi + toplam etkileşim: HER METRİK AYRI ÇAĞRI (tek bir desteklenmeyen
+      // metrik tüm isteği 400'ler). Hata yalnız o metriği null bırakır; sorun kodu yazılır.
+      for (const name of IG_EXTRA_METRICS) {
+        try {
+          const extra = await ig(
+            `${encodeURIComponent(e.platformId!)}/insights`,
+            { metric: name },
+            NEEDS_IG_SCOPE,
+          );
+          const got = instagramMetrics(extra, {});
+          for (const key of ["avgWatchTimeMs", "totalWatchTimeMs", "totalInteractions"] as const)
+            if (got[key] !== undefined) result.metrics[key] = got[key];
+        } catch (error) {
+          const code = issueCode(error);
+          result.issues.push(
+            code.startsWith("needs_") ? code : `instagram_${name}_${code}`,
+          );
+          if (code.startsWith("needs_") || IG_STOP_EXTRAS.test(code)) break;
+        }
       }
       return result;
     }

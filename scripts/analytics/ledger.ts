@@ -48,6 +48,10 @@ export type Metrics = {
   shares: number | null;
   saves: number | null;
   reach: number | null;
+  // Opsiyonel (eski satırlar/okuyucular etkilenmez; emptyMetrics'e KONMAZ): IG Reels izlenme süresi.
+  avgWatchTimeMs?: number | null; // ig_reels_avg_watch_time (ms)
+  totalWatchTimeMs?: number | null; // ig_reels_video_view_total_time (ms)
+  totalInteractions?: number | null; // total_interactions
 };
 export type Event = {
   schema: 1;
