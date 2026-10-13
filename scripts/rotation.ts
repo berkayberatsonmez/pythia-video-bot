@@ -144,7 +144,7 @@ const POOL_WEIGHTS: Record<PoolKey, number> = {
   zodiac: 2,
   ranking: 2,
   behavior: 2,
-  compat: 2,
+  compat: 3, // ilişki içeriği en iyi performans: dizide öne çekilir (2→3)
   numerology: 1,
   angel: 1,
   manifest: 1,
@@ -214,6 +214,36 @@ export function buildSequence(): SelectedVideo[] {
     cursor[best]++;
     if (first === null) first = best;
   }
+  return repairAdjacency(seq);
+}
+
+// Açgözlü kurulum, büyük poolun (compat, ağırlık 3) ağırlıkla öne çekilmesinde
+// kuyrukta dairesel bir çakışma (son = ilk pool) bırakabiliyor. Çakışan elemanı,
+// komşuları kendi poolundan olmayan ilk uygun boşluğa taşır (deterministik:
+// soldan sağa ilk uygun yer). Çakışma yoksa dizi aynen döner.
+function repairAdjacency(seq: SelectedVideo[]): SelectedVideo[] {
+  const n = seq.length;
+  const bad = (a: SelectedVideo[], i: number) => a[i].poolKey === a[(i + 1) % a.length].poolKey;
+  for (let guard = 0; guard < n; guard++) {
+    const i = seq.findIndex((_, k) => bad(seq, k));
+    if (i < 0) return seq;
+    const j = (i + 1) % n; // taşınacak eleman
+    const rest = seq.filter((_, k) => k !== j);
+    const m = rest.length;
+    let placed = false;
+    for (let p = 0; p < m; p++) {
+      // rest[p-1] ile rest[p] arasına ekle (dairesel)
+      const left = rest[(p - 1 + m) % m];
+      const right = rest[p];
+      if (left.poolKey !== seq[j].poolKey && right.poolKey !== seq[j].poolKey && left.poolKey !== right.poolKey) {
+        rest.splice(p, 0, seq[j]);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) return seq; // mevcut veri boyutlarında olmaz; verify-rotation yakalar
+    seq = rest;
+  }
   return seq;
 }
 
@@ -221,14 +251,16 @@ const SEQUENCE = buildSequence();
 
 // Tek seferlik geçiş kaydırması (2026-10-13). Dizi yeniden kurulunca hangi
 // id'nin hangi güne düştüğü değişti; hiçbir şey yapılmasaydı eski dizinin son
-// 30 günde yayınladığı id'lerin ~%33'ü (ilk haftada ~%50'si) tekrar çıkardı
-// (yayın tarafında 30 günlük bir mükerrer koruması yok; worker/dedup yalnız
-// 20 saatlik aynı-başlık penceresi). 0..188 arasında tüm kaydırmalar denendi:
-// 49, önümüzdeki 30 günde eski yayınlarla çakışmayı 20'den 5'e (60 slotta)
-// indiriyor. Komşuluk dairesel olduğundan kaydırma "farklı kategori"
-// değişmezini bozmaz. Değiştirme: yeni kaydırma yayın geçmişini yeniden
-// tekrar ettirir.
-const SEQUENCE_OFFSET = 49;
+// 30 günde yayınladığı id'lerin önemli kısmı tekrar çıkardı (yayın tarafında 30
+// günlük bir mükerrer koruması yok; worker/dedup yalnız 20 saatlik aynı-başlık
+// penceresi). Ofset, geçmiş = eski (round-robin) dizinin 2026-09-13…10-12
+// yayınları; gelecek = 2026-10-13…11-11 (Gök Gündemi kaymasıyla, rotasyona
+// kalan 54 slot) üzerinden 0..188 tümü denenerek seçildi:
+//   uyum ağırlığı 2 → 3 sonrası: ofset 49 → 7/54 çakışma, ofset 54 → 5/54 (en iyi).
+// (Önceki seçim, ağırlık 2 ve Gök Gündemi yokken: 49 → 5/60.)
+// Komşuluk dairesel olduğundan kaydırma "farklı kategori" değişmezini bozmaz.
+// Değiştirme: yeni kaydırma yayın geçmişini yeniden tekrar ettirir.
+export const SEQUENCE_OFFSET = 54;
 
 // Gün numarası — epoch'tan bu yana gün sayısı (UTC)
 export function dayNumber(): number {
