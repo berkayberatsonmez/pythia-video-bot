@@ -77,6 +77,7 @@ function renderOne(v: SelectedVideo, voiceover: Voiceover | null): string {
   );
   const propsFile = join(tmpdir(), `pythia-rot-${Date.now()}-${v.slot}.json`);
   const props: Record<string, unknown> = { [v.propKey]: v.id };
+  if (v.extraProps) Object.assign(props, v.extraProps);
   if (voiceover) props.voiceover = voiceover;
   writeFileSync(propsFile, JSON.stringify(props));
 
