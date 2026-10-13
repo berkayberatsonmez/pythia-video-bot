@@ -15,7 +15,7 @@
 
 import { readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
-import { buildInstagramCaption, buildFirstComment } from "./metadata";
+import { buildInstagramCaption, buildFirstComment, optsFromContext } from "./metadata";
 
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 const INIT_URL =
@@ -125,6 +125,7 @@ export async function postToTikTokFromFile(
   videoPath: string,
   category: string,
   id: string,
+  slot?: string,
 ): Promise<string | null> {
   try {
     if (!existsSync(videoPath)) throw new Error(`Video bulunamadı: ${videoPath}`);
@@ -133,7 +134,7 @@ export async function postToTikTokFromFile(
 
     // Caption (IG caption TikTok için de ideal: hook + Kaydet/Gönder/Yorum +
     // 5 hashtag + bio link) ve ilk yorum → yanına .txt olarak kaydet.
-    const caption = buildInstagramCaption(category, id);
+    const caption = buildInstagramCaption(category, id, optsFromContext({ slot }));
     const firstComment = buildFirstComment(category, id);
     const capPath = join(
       dirname(videoPath),

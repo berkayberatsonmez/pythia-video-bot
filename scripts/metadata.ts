@@ -20,6 +20,77 @@ import { getBehaviorById } from "../src/data/zodiac-behaviors";
 import { getCompatibilityById } from "../src/data/zodiac-compatibility";
 import { skyCardById } from "./sky-events";
 import type { SkyCard } from "../src/data/sky-types";
+import { istanbulDate } from "./sky-events";
+import {
+  TAG_CAP,
+  topicalContext,
+  topicalHashtags,
+  type Slot,
+  type TopicalContext,
+} from "./topical";
+
+/**
+ * Güncel bağlam seçenekleri. Verilmezse tarih = bugün (İstanbul), slot = sabah.
+ * Yayın yolu slotu geçirir (aynı gün sabah/akşam farklı etiket setleri için).
+ */
+export interface MetaOpts {
+  date?: string;
+  slot?: Slot;
+  /** Trend başlıkları (test/verify için enjekte; yoksa out/trends dosyasından). */
+  trends?: string[];
+}
+
+/** Kategorinin eski sabit etiketleri → topical.ts'te "seed" kaynağı (video-özel etiketlerden sonra). */
+function seedsFor(category: string, id: string): string[] {
+  switch (category) {
+    case "dream":
+      return ["#rüyayorumu", "#bilinçaltı", "#rüya"];
+    case "tarot":
+      return ["#günlükkart", "#kehanet"];
+    case "number":
+      return getNumberById(id)?.kind === "angel"
+        ? ["#numeroloji", "#ruhsalfarkındalık"]
+        : ["#ruhsalfarkındalık", "#mistik"];
+    case "manifest":
+      return ["#olumlama", "#çekimyasası", "#manifestasyon"];
+    case "behavior":
+    case "compat":
+      return ["#ilişki"];
+    default:
+      return [];
+  }
+}
+
+/** Yayın bağlamındaki slot adını (serbest string) MetaOpts'a çevirir. */
+export function optsFromContext(ctx?: { slot?: string }): MetaOpts {
+  const slot = ctx?.slot === "evening" ? "evening" : ctx?.slot === "morning" ? "morning" : undefined;
+  return { slot };
+}
+
+export function topicalFor(category: string, id: string, o?: MetaOpts): TopicalContext {
+  return topicalContext(
+    o?.date ?? istanbulDate(new Date()),
+    { category, id, slot: o?.slot, seedTags: seedsFor(category, id) },
+    { trends: o?.trends },
+  );
+}
+
+/** Başlık: doğal bir önek varsa ve 100 karaktere sığıyorsa kullan; sığmazsa KIRPMADAN düz başlık. */
+function leadTitle(lead: string | undefined, plain: string, led: (l: string) => string): string {
+  if (!lead) return clampTitle(plain);
+  const t = led(lead);
+  return t.length <= 100 ? t : clampTitle(plain);
+}
+
+/** YouTube açıklaması: en çok 3 hashtag (ilk üçü başlığın üstünde görünür); #shorts başlıkta. */
+function ytHashtags(T: TopicalContext): string {
+  return topicalHashtags(T, TAG_CAP.youtube).join(" ");
+}
+
+/** Açıklamada kanca satırından hemen sonra güncel satırı ekler. */
+function withTopicalLine(lines: string[], line?: string): string[] {
+  return line ? [lines[0], line, ...lines.slice(1)] : lines;
+}
 
 export type VideoMeta = {
   title: string;
@@ -58,14 +129,17 @@ function clampTags(tags: string[]): string[] {
 }
 
 // ─── DREAM ───────────────────────────────────────────────────────────────
-function dreamMeta(id: string): VideoMeta | null {
+function dreamMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const s = getSymbolById(id);
   if (!s) return null;
+  const T = topicalFor("dream", id, o);
   const upper = s.symbolNameUpper.replace(/\n/g, " ");
-  const title = clampTitle(
+  const title = leadTitle(
+    T.titleLead,
     `Rüyanda ${upper} Gördüysen 🌙 Bilinçaltın Bu 3 Şeyi Söylüyor #shorts`,
+    (l) => `${l} Rüyanda ${upper} Gördüysen 🌙 Bilinçaltın Bu 3 Şeyi Söylüyor #shorts`,
   );
-  const desc = [
+  const desc = withTopicalLine([
     `Rüyanda ${s.symbolName} gördüysen bilinçaltın bunu söylüyor 🌙`,
     "",
     ...s.meanings.map((m, i) => `${i + 1}️⃣ ${m.title}\n${m.desc.replace(/\n/g, " ")}`),
@@ -74,14 +148,15 @@ function dreamMeta(id: string): VideoMeta | null {
     "",
     "Seninki nasıldı? 👇 Yorumlara yaz, beraber yorumlayalım 🌙",
     ...PYTHIA_CTA,
-    `#rüyatabiri #rüya ${s.hashtag} #rüyayorumu #bilinçaltı #mistik #dream #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "rüya tabiri",
       "rüya yorumu",
       `rüyada ${s.symbolName} görmek`,
@@ -99,13 +174,16 @@ function dreamMeta(id: string): VideoMeta | null {
 }
 
 // ─── TAROT ───────────────────────────────────────────────────────────────
-function tarotMeta(id: string): VideoMeta | null {
+function tarotMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const c = getTarotById(id);
   if (!c) return null;
-  const title = clampTitle(
+  const T = topicalFor("tarot", id, o);
+  const title = leadTitle(
+    T.titleLead,
     `Bugün Senin Kartın: ${c.cardName} 🔮 Evren Sana Bunu Söylüyor #shorts`,
+    (l) => `${l} Bugün Senin Kartın: ${c.cardName} 🔮 Evren Sana Bunu Söylüyor #shorts`,
   );
-  const desc = [
+  const desc = withTopicalLine([
     `Bugün senin tarot kartın: ${c.cardName} (${c.cardNameSub}) 🔮`,
     `Enerji: ${c.energy}`,
     "",
@@ -115,14 +193,15 @@ function tarotMeta(id: string): VideoMeta | null {
     "",
     "Sen bugün hangi kartı çekiyorsun? 👇 Yorumlara yaz 🔮",
     ...PYTHIA_CTA,
-    `#tarot #tarotfalı #günlüktarot #fal #mistik #tarotreading #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "tarot",
       "tarot falı",
       "günlük tarot",
@@ -140,15 +219,16 @@ function tarotMeta(id: string): VideoMeta | null {
 }
 
 // ─── NUMBER (lifepath + angel) ───────────────────────────────────────────
-function numberMeta(id: string): VideoMeta | null {
+function numberMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const n = getNumberById(id);
   if (!n) return null;
+  const T = topicalFor("number", id, o);
 
   if (n.kind === "lifepath") {
     const title = clampTitle(
       `Yaşam Yolu ${n.number} İsen 🔢 ${n.title} Olduğunu Biliyor muydun? #shorts`,
     );
-    const desc = [
+    const desc = withTopicalLine([
       `Yaşam yolu sayın ${n.number} ise, sen bir ${n.title.toLowerCase()}sın 🔢`,
       "",
       ...n.meanings.map((m, i) => `${i + 1}️⃣ ${m.title}\n${m.desc.replace(/\n/g, " ")}`),
@@ -157,14 +237,15 @@ function numberMeta(id: string): VideoMeta | null {
       "",
       "Senin yaşam yolu sayın kaç? 👇 Yorumlara yaz 🔢",
       ...PYTHIA_CTA,
-      `#numeroloji #yaşamyolu #numeroloji${n.number} #mistik #numerology #shorts`,
+      ytHashtags(T),
       "",
       DISCLAIMER,
-    ].join("\n");
+    ], T.captionLine).join("\n");
     return {
       title,
       description: desc,
       tags: clampTags([
+        ...T.keywords.slice(0, 2),
         "numeroloji",
         "yaşam yolu sayısı",
         `yaşam yolu ${n.number}`,
@@ -184,7 +265,7 @@ function numberMeta(id: string): VideoMeta | null {
   const title = clampTitle(
     `Sürekli ${n.number} Görüyorsan 👁️ Melekler Sana Bunu Söylüyor #shorts`,
   );
-  const desc = [
+  const desc = withTopicalLine([
     `Sürekli ${n.number} görüyorsan bu tesadüf değil — ${n.title} ✨`,
     "",
     ...n.meanings.map((m, i) => `${i + 1}️⃣ ${m.title}\n${m.desc.replace(/\n/g, " ")}`),
@@ -193,14 +274,15 @@ function numberMeta(id: string): VideoMeta | null {
     "",
     "Sen hangi sayıyı sürekli görüyorsun? 👇 Yorumlara yaz ✨",
     ...PYTHIA_CTA,
-    `#melekSayıları #melekSayısı${n.number} #manifest #mistik #angelnumbers #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "melek sayıları",
       `${n.number} melek sayısı`,
       `melek sayısı ${n.number}`,
@@ -217,14 +299,17 @@ function numberMeta(id: string): VideoMeta | null {
 }
 
 // ─── ZODIAC ──────────────────────────────────────────────────────────────
-function zodiacMeta(id: string): VideoMeta | null {
+function zodiacMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const z = getZodiacById(id);
   if (!z) return null;
+  const T = topicalFor("zodiac", id, o);
   const subLower = z.signNameSub.toLowerCase();
-  const title = clampTitle(
+  const title = leadTitle(
+    T.titleLead,
     `${z.signName} Burcuysan 🔮 Kimsenin Bilmediği 3 Gizli Özelliğin #shorts`,
+    (l) => `${l} ${z.signName} Burcuysan 🔮 Kimsenin Bilmediği 3 Gizli Özelliğin #shorts`,
   );
-  const desc = [
+  const desc = withTopicalLine([
     `${z.signName} (${z.signNameSub}) burcunun kimsenin bilmediği gizli yüzü 🔮`,
     `Element: ${z.element} · ${z.dateRange}`,
     "",
@@ -234,14 +319,15 @@ function zodiacMeta(id: string): VideoMeta | null {
     "",
     `${z.signName} olan var mı? 👇 Yorumlara yaz, etiketle 🔮`,
     ...PYTHIA_CTA,
-    `#burç ${z.hashtag} #astroloji #burçyorumu #${subLower} #zodiac #astrology #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "burç",
       "burç yorumu",
       `${z.signName} burcu`,
@@ -259,15 +345,15 @@ function zodiacMeta(id: string): VideoMeta | null {
 }
 
 // ─── MANIFESTO ───────────────────────────────────────────────────────────
-function manifestMeta(id: string): VideoMeta | null {
+function manifestMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const m = getManifestById(id);
   if (!m) return null;
+  const T = topicalFor("manifest", id, o);
   const t = m.theme.charAt(0) + m.theme.slice(1).toLocaleLowerCase("tr");
-  const themeTag = "#" + m.theme.toLocaleLowerCase("tr").replace(/\s+/g, "");
   const title = clampTitle(
     `${t} İstiyorsan Bunu Her Sabah Oku 🌙 Manifesto #shorts`,
   );
-  const desc = [
+  const desc = withTopicalLine([
     `${t} istiyorsan bunu her sabah yüksek sesle oku 🌙`,
     "",
     ...m.lines.map((l) => `✨ ${l}`),
@@ -277,14 +363,15 @@ function manifestMeta(id: string): VideoMeta | null {
     "",
     "Sen neyi manifest ediyorsun? 👇 Yorumlara yaz 🌙",
     ...PYTHIA_CTA,
-    `${themeTag} #manifesto #olumlama #manifest #çekimyasası #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "manifesto",
       "olumlama",
       "manifest",
@@ -302,12 +389,17 @@ function manifestMeta(id: string): VideoMeta | null {
 }
 
 // ─── RANKING (viral top-3 burç sıralaması) ───────────────────────────────
-function rankingMeta(id: string): VideoMeta | null {
+function rankingMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const r = getRankingById(id);
   if (!r) return null;
+  const T = topicalFor("ranking", id, o);
   const nm = (sid: string) => getZodiacById(sid)?.signName ?? sid;
-  const title = clampTitle(`${r.trait} 3 Burç 🔮 Seninki Var mı? #shorts`);
-  const desc = [
+  const title = leadTitle(
+    T.titleLead,
+    `${r.trait} 3 Burç 🔮 Seninki Var mı? #shorts`,
+    (l) => `${l} ${r.trait} 3 Burç 🔮 Seninki Var mı? #shorts`,
+  );
+  const desc = withTopicalLine([
     `${r.trait} 3 burç 🔮`,
     "",
     `🥉 3. ${nm(r.ranks[0].signId)} — ${r.ranks[0].blurb}`,
@@ -316,14 +408,15 @@ function rankingMeta(id: string): VideoMeta | null {
     "",
     `${r.question} 👇 Yorumlara yaz`,
     ...PYTHIA_CTA,
-    `#burç #astroloji #burçlar #burçyorumu #zodiac #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "burç",
       "astroloji",
       "burç sıralaması",
@@ -338,12 +431,13 @@ function rankingMeta(id: string): VideoMeta | null {
 }
 
 // ─── BEHAVIOR (viral burç davranış senaryosu) ────────────────────────────
-function behaviorMeta(id: string): VideoMeta | null {
+function behaviorMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const b = getBehaviorById(id);
   if (!b) return null;
+  const T = topicalFor("behavior", id, o);
   const nm = getZodiacById(b.signId)?.signName ?? "";
   const title = clampTitle(`Bir ${nm} ${b.scenario}… 😱 #shorts`);
-  const desc = [
+  const desc = withTopicalLine([
     `Bir ${nm} ${b.scenario} ne yapar? 👀`,
     "",
     `1️⃣ ${b.beats[0]}`,
@@ -352,14 +446,15 @@ function behaviorMeta(id: string): VideoMeta | null {
     "",
     `${b.question} 👇 Yorumlara yaz`,
     ...PYTHIA_CTA,
-    `#burç #astroloji #burçlar #ilişki #zodiac #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "burç",
       "astroloji",
       "burç davranışları",
@@ -374,13 +469,18 @@ function behaviorMeta(id: string): VideoMeta | null {
 }
 
 // ─── COMPAT (viral burç uyumu) ───────────────────────────────────────────
-function compatMeta(id: string): VideoMeta | null {
+function compatMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const c = getCompatibilityById(id);
   if (!c) return null;
+  const T = topicalFor("compat", id, o);
   const n1 = getZodiacById(c.sign1Id)?.signName ?? "";
   const n2 = getZodiacById(c.sign2Id)?.signName ?? "";
-  const title = clampTitle(`${n1} + ${n2} = ${c.verdict} #shorts`);
-  const desc = [
+  const title = leadTitle(
+    T.titleLead,
+    `${n1} + ${n2} = ${c.verdict} #shorts`,
+    (l) => `${l} ${n1} + ${n2} = ${c.verdict} #shorts`,
+  );
+  const desc = withTopicalLine([
     `${n1} + ${n2} uyumlu mu? 👀`,
     "",
     `Sonuç: ${c.verdict}`,
@@ -390,14 +490,15 @@ function compatMeta(id: string): VideoMeta | null {
     "",
     `${c.question} 👇 O kişiyi etiketle`,
     ...PYTHIA_CTA,
-    `#burç #burçuyumu #astroloji #ilişki #zodiac #shorts`,
+    ytHashtags(T),
     "",
     DISCLAIMER,
-  ].join("\n");
+  ], T.captionLine).join("\n");
   return {
     title,
     description: desc,
     tags: clampTags([
+      ...T.keywords.slice(0, 2),
       "burç",
       "burç uyumu",
       "astroloji",
@@ -424,9 +525,10 @@ const SKY_TITLE: Record<SkyCard["kind"], (c: SkyCard) => string> = {
   "solar-eclipse": (c) => `${c.signName} Burcunda Güneş Tutulması: Yeni Sayfa Teması`,
 };
 
-function skyMeta(id: string): VideoMeta | null {
+function skyMeta(id: string, o?: MetaOpts): VideoMeta | null {
   const c = skyCardById(id);
   if (!c) return null;
+  const T = topicalFor("sky", id, o);
   const lines = c.affected.map((a) => `• ${a.signName}: ${a.line}`);
   const tagWord = c.hashtags[0].replace(/^#/, "");
   return {
@@ -443,7 +545,7 @@ function skyMeta(id: string): VideoMeta | null {
       "",
       "Senin burcun listede mi? Yorumlara yaz 👇",
       ...PYTHIA_CTA,
-      c.hashtags.join(" "),
+      ytHashtags(T),
       "",
       DISCLAIMER,
     ].join("\n"),
@@ -467,35 +569,35 @@ function skyMeta(id: string): VideoMeta | null {
 }
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────
-export function buildMetadata(category: string, id: string): VideoMeta {
+export function buildMetadata(category: string, id: string, opts?: MetaOpts): VideoMeta {
   let meta: VideoMeta | null = null;
   switch (category) {
     case "dream":
-      meta = dreamMeta(id);
+      meta = dreamMeta(id, opts);
       break;
     case "tarot":
-      meta = tarotMeta(id);
+      meta = tarotMeta(id, opts);
       break;
     case "number":
-      meta = numberMeta(id);
+      meta = numberMeta(id, opts);
       break;
     case "zodiac":
-      meta = zodiacMeta(id);
+      meta = zodiacMeta(id, opts);
       break;
     case "manifest":
-      meta = manifestMeta(id);
+      meta = manifestMeta(id, opts);
       break;
     case "ranking":
-      meta = rankingMeta(id);
+      meta = rankingMeta(id, opts);
       break;
     case "behavior":
-      meta = behaviorMeta(id);
+      meta = behaviorMeta(id, opts);
       break;
     case "compat":
-      meta = compatMeta(id);
+      meta = compatMeta(id, opts);
       break;
     case "sky":
-      meta = skyMeta(id);
+      meta = skyMeta(id, opts);
       break;
   }
   if (!meta) {
@@ -509,7 +611,7 @@ export function buildMetadata(category: string, id: string): VideoMeta {
 //   • İlk satır = güçlü kanca (IG 125 karakterde "...more" ile keser)
 //   • 3 anlam → sessiz izlenebilir (completion rate ↑)
 //   • CTA: 🔖 Kaydet + 📤 Gönder (2026 #1 sinyal: DM share) + 💬 Yorum
-//   • 5 hashtag (2026: 5'ten fazlası reach DÜŞÜRÜR) → 4 niche + #keşfet
+//   • 5 hashtag (2026: 5'ten fazlası reach DÜŞÜRÜR): topical.ts seçer (video > gök/takvim > evergreen)
 // ═══════════════════════════════════════════════════════════════════════════
 
 const IG_BRAND = [
@@ -531,9 +633,12 @@ function igAssemble(p: {
   share: string;
   comment: string;
   hashtags: string[];
+  /** Güncel satır (topical.ts); kancadan hemen sonra. Kanca satırı DEĞİŞMEZ (mükerrer koruması ona bakar). */
+  captionLine?: string;
 }): string {
   const lines = [
     p.hook,
+    ...(p.captionLine ? [p.captionLine] : []),
     "",
     ...p.body,
     "",
@@ -544,7 +649,7 @@ function igAssemble(p: {
     "",
     ...IG_BRAND,
     "",
-    p.hashtags.slice(0, 5).join(" "),
+    p.hashtags.join(" "),
     "",
     "* Yalnızca eğlence amaçlıdır.",
   ];
@@ -552,7 +657,10 @@ function igAssemble(p: {
   return caption.length > 2150 ? caption.slice(0, 2150) : caption;
 }
 
-export function buildInstagramCaption(category: string, id: string): string {
+export function buildInstagramCaption(category: string, id: string, opts?: MetaOpts): string {
+  const T = topicalFor(category, id, opts);
+  const tags = topicalHashtags(T, TAG_CAP.instagram, true);
+  const captionLine = T.captionLine;
   switch (category) {
     case "dream": {
       const s = getSymbolById(id);
@@ -564,7 +672,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — sabah hatırla",
         share: "Aynı rüyayı gören birine gönder",
         comment: "Seninki nasıldı? Yorumlara yaz",
-        hashtags: ["#rüyatabiri", "#rüyayorumu", s.hashtag, "#bilinçaltı", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "tarot": {
@@ -577,7 +686,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — günün kartı",
         share: "Bugün kart çekmesi gereken birine gönder",
         comment: "Sen hangi kartı çekiyorsun?",
-        hashtags: ["#tarot", "#tarotfalı", "#günlükkart", "#kehanet", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "zodiac": {
@@ -590,7 +700,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — sonra oku",
         share: `Bir ${z.signName} burcuna gönder`,
         comment: `${z.signName} olan var mı? Yorumlara yaz`,
-        hashtags: ["#burç", "#astroloji", "#günlükburç", z.hashtag, "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "number": {
@@ -604,7 +715,8 @@ export function buildInstagramCaption(category: string, id: string): string {
           save: "Kaydet — kendini tanı",
           share: `Yaşam yolu ${n.number} olan birine gönder`,
           comment: "Senin yaşam yolu sayın kaç?",
-          hashtags: ["#numeroloji", "#yaşamyolu", "#ruhsalfarkındalık", "#mistik", "#pythia"],
+          hashtags: tags,
+        captionLine,
         });
       }
       return igAssemble({
@@ -614,14 +726,14 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — işaret bu",
         share: `Sürekli ${n.number} gören birine gönder`,
         comment: "Sen hangi sayıyı görüyorsun?",
-        hashtags: ["#meleksayıları", "#numeroloji", `#${n.number}`, "#ruhsalfarkındalık", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "manifest": {
       const m = getManifestById(id);
       if (!m) break;
       const t = m.theme.charAt(0) + m.theme.slice(1).toLocaleLowerCase("tr");
-      const themeTag = "#" + m.theme.toLocaleLowerCase("tr").replace(/\s+/g, "");
       return igAssemble({
         hook: `${t} istiyorsan bunu yüksek sesle oku 🌙✨`,
         body: m.lines.map((l) => `✨ ${l}`),
@@ -629,7 +741,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — her sabah oku",
         share: "Bunu duyması gereken birine gönder",
         comment: 'İnanıyorsan "geliyor" yaz 💫',
-        hashtags: [themeTag, "#manifest", "#olumlama", "#çekimyasası", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "ranking": {
@@ -647,7 +760,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — arkadaşına göster",
         share: "Bu listede olan birine gönder",
         comment: `${r.question} Yorumlara yaz`,
-        hashtags: ["#burç", "#astroloji", "#burçlar", "#burçyorumu", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "behavior": {
@@ -665,7 +779,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — aklına biri geldi 👀",
         share: `Bir ${nm}'a gönder 😏`,
         comment: `${b.question} Yorumlara yaz`,
-        hashtags: ["#burç", "#astroloji", "#burçlar", "#ilişki", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "compat": {
@@ -684,7 +799,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — birine göstereceksin",
         share: "O kişiyi yorumlarda etiketle 👇",
         comment: `${c.question} Etiketle 😏`,
-        hashtags: ["#burç", "#burçuyumu", "#astroloji", "#ilişki", "#pythia"],
+        hashtags: tags,
+        captionLine,
       });
     }
     case "sky": {
@@ -700,7 +816,8 @@ export function buildInstagramCaption(category: string, id: string): string {
         save: "Kaydet — bu dönemde dön bak",
         share: "Burcu uyan birine gönder",
         comment: "Senin burcun listede mi? Yorumlara yaz",
-        hashtags: c.hashtags,
+        hashtags: tags,
+        captionLine,
       });
     }
   }
@@ -770,6 +887,7 @@ function ttAssemble(
   teaser: string,
   question: string,
   hashtags: (string | undefined)[],
+  captionLine?: string,
 ): TikTokMeta {
   const oneLine = (s: string) => s.replace(/\s*\n\s*/g, " ").trim();
   // CASE-INSENSITIVE dedup: farklı yazımlı aynı etiket (#meleksayıları vs
@@ -787,85 +905,82 @@ function ttAssemble(
     if (tags.length === 5) break;
   }
   const first = oneLine(line1);
-  const caption = [first, oneLine(teaser), oneLine(question), tags.join(" ")]
+  const caption = [first, captionLine ? oneLine(captionLine) : "", oneLine(teaser), oneLine(question), tags.join(" ")]
     .filter((l) => l.length > 0)
     .join("\n");
   return { caption, line1: first };
 }
 
-export function buildTikTokMetadata(category: string, id: string): TikTokMeta {
+export function buildTikTokMetadata(category: string, id: string, opts?: MetaOpts): TikTokMeta {
+  const T = topicalFor(category, id, opts);
+  // TikTok: marka etiketi yok (eski kural), en çok 5 niş etiket; line1 (dedup anahtarı) tarihten BAĞIMSIZ.
+  const tags = topicalHashtags(T, TAG_CAP.tiktok, false);
+  const asm = (line1: string, teaser: string, question: string): TikTokMeta =>
+    ttAssemble(line1, teaser, question, tags, T.captionLine);
   switch (category) {
     case "dream": {
       const s = getSymbolById(id);
       if (s)
-        return ttAssemble(
+        return asm(
           `Rüyada ${s.symbolName} görmek ne demek?`,
           `Çoğu kişi korkar ama bilinçaltın "${s.meanings[0].title}" diyor.`,
           "Seninki nasıldı? 👇",
-          ["#rüyatabiri", "#rüya", s.hashtag, "#mistik"],
         );
       break;
     }
     case "tarot": {
       const c = getTarotById(id);
       if (c)
-        return ttAssemble(
+        return asm(
           `Bugünün kartı: ${c.cardName}`,
           `${c.meanings[0].title} enerjisi bugün seninle.`,
           "Sana ne söylüyor sence? 👇",
-          ["#tarot", "#tarotfalı", "#günlükkart", c.hashtag],
         );
       break;
     }
     case "number": {
       const n = getNumberById(id);
       if (n && n.kind === "angel")
-        return ttAssemble(
+        return asm(
           `${n.number} sürekli karşına mı çıkıyor?`,
           `Melekler "${n.title}" mesajını fısıldıyor.`,
           "Sen de mi görüyorsun? 👇",
-          ["#meleksayıları", "#numeroloji", n.hashtag, "#ruhsalfarkındalık"],
         );
       if (n)
-        return ttAssemble(
+        return asm(
           `Yaşam yolu ${n.number}: ${n.title}`,
           `${n.meanings[0].title} — seni sen yapan şey bu.`,
           "Senin sayın kaç? 👇",
-          ["#numeroloji", "#yaşamyolu", n.hashtag, "#kişilik"],
         );
       break;
     }
     case "zodiac": {
       const z = getZodiacById(id);
       if (z)
-        return ttAssemble(
+        return asm(
           `${z.signName} burcunun bugünü`,
           `${z.meanings[0].title}: ${z.meanings[0].desc}`,
           `Sen ${z.signName} musun? 👇`,
-          ["#burç", "#astroloji", "#burçyorumu", z.hashtag],
         );
       break;
     }
     case "manifest": {
       const m = getManifestById(id);
       if (m)
-        return ttAssemble(
+        return asm(
           `${m.theme} için sabah olumlaması`,
           m.lines[0],
           "Bugün senin niyetin ne? 👇",
-          ["#manifestasyon", "#çekimyasası", "#olumlama", m.hashtag],
         );
       break;
     }
     case "ranking": {
       const r = getRankingById(id);
       if (r) {
-        const winner = getZodiacById(r.ranks[2].signId); // ranks = [3.,2.,1.] → [2]=1. sıra
-        return ttAssemble(
+        return asm(
           `${r.trait} burçlar`,
           "İlk 3'te seninki var mı, tahmin et.",
           r.question,
-          ["#burç", "#astroloji", "#burçsıralaması", winner?.hashtag],
         );
       }
       break;
@@ -874,11 +989,10 @@ export function buildTikTokMetadata(category: string, id: string): TikTokMeta {
       const b = getBehaviorById(id);
       if (b) {
         const z = getZodiacById(b.signId);
-        return ttAssemble(
+        return asm(
           `Bir ${z?.signName ?? "burç"} ${b.scenario}`,
           b.beats[0],
           b.question,
-          ["#burç", "#astroloji", "#burçyorumu", z?.hashtag],
         );
       }
       break;
@@ -888,11 +1002,10 @@ export function buildTikTokMetadata(category: string, id: string): TikTokMeta {
       if (c) {
         const z1 = getZodiacById(c.sign1Id);
         const z2 = getZodiacById(c.sign2Id);
-        return ttAssemble(
+        return asm(
           `${z1?.signName ?? "?"} + ${z2?.signName ?? "?"}: ${c.verdict}`,
           c.beats[0],
           c.question,
-          ["#burçuyumu", "#astroloji", "#ilişki", z1?.hashtag],
         );
       }
       break;
@@ -900,11 +1013,10 @@ export function buildTikTokMetadata(category: string, id: string): TikTokMeta {
     case "sky": {
       const c = skyCardById(id);
       if (c)
-        return ttAssemble(
+        return asm(
           c.hookLine,
           `${c.affected[0].signName}, ${c.affected[1].signName} ve ${c.affected[2].signName} bunu daha çok hissedebilir.`,
           "Senin burcun listede mi? 👇",
-          c.hashtags.slice(0, 4),
         );
       break;
     }
