@@ -140,12 +140,25 @@ export interface SkyState {
 }
 
 const skyCache = new Map<string, SkyState>();
+// rawEvents pahalı (5 gezegen taraması): 40 günlük kovalar için bir kez hesapla.
+// Pencere kovanın 200 gün öncesinden 4 gün sonrasına — en uzun retro (Satürn ~140 gün)
+// başlangıcı ve ±1 gün Ay olayları her gün için pencerede kalır.
+const BUCKET = 40;
+const eventCache = new Map<number, ReturnType<typeof rawEvents>>();
+function bucketEvents(day: number): ReturnType<typeof rawEvents> {
+  const b = Math.floor(day / BUCKET);
+  let evs = eventCache.get(b);
+  if (!evs) {
+    evs = rawEvents((b * BUCKET - 200) * DAY_MS, ((b + 1) * BUCKET + 4) * DAY_MS);
+    eventCache.set(b, evs);
+  }
+  return evs;
+}
 export function skyState(date: string): SkyState {
   const hit = skyCache.get(date);
   if (hit) return hit;
   const day = dateToDay(date);
-  // 180 gün geri: en uzun retro (Satürn ~140 gün) başlangıcı pencerede kalsın.
-  const evs = rawEvents((day - 180) * DAY_MS, (day + 3) * DAY_MS);
+  const evs = bucketEvents(day);
   const retro: RetroState[] = [];
   for (const e of evs) {
     if (!(e.body in PLANET_COPY)) continue;
@@ -232,7 +245,7 @@ export function calendarMoments(date: string): CalMoment[] {
   return out;
 }
 
-function weekdayMoment(date: string): CalMoment | null {
+export function weekdayMoment(date: string): CalMoment | null {
   const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
   if (dow === 1) return { line: "Yeni haftanın enerjisi 🌙", tags: ["#haftanınenerjisi"], kw: "haftanın enerjisi" };
   if (dow === 5) return { line: "Hafta sonuna girerken 🌙", tags: [] };
@@ -511,11 +524,15 @@ export function topicalContext(date: string, video: TopicalVideo, opts: TopicalO
     const tag = tagify(`${nm}retrosu`);
     const kw = low(`${nm} retrosu`);
     const fast = FAST.includes(r.planet);
+    // Yavaş gezegen retroları (Jüpiter/Satürn) yalnız burç/astro içeriklerinde; rüya/numeroloji/manifest
+    // videolarına "Satürn retrosu" etiketi alakasız olur.
+    if (!fast && !ASTRO_CATS.includes(cat)) continue;
     if (r.phase === "active") {
       addCand({
         // Hızlı gezegenler (Merkür/Venüs/Mars) öne; yavaşlar etiket olarak geride kalır.
         tier: fast ? 2 : 3,
-        line: fast ? `${nm} retrosu sürerken ${emoji}` : undefined,
+        // Haftalarca süren retroda her gönderi aynı satırı taşımasın: ~2/3'ünde (günlük/slot hash'i).
+        line: fast && h % 3 !== 0 ? `${nm} retrosu sürerken ${emoji}` : undefined,
         lead: fast && h % 2 === 0 ? `${nm} Retrosunda` : undefined,
         items: [{ tag, src: "sky", kw }],
         note: `${r.planet} retro aktif`,
@@ -744,7 +761,7 @@ export const TAG_CAP: Record<Platform, number> = { instagram: 5, tiktok: 5, yout
  *  • Sky/takvim/trend için 1 (cap ≥ 5 ise 2) yer AYRILIR — yoksa özellik hiç görünmez;
  *    videoya özgü etiketler kalan yerleri doldurur (video > sky > evergreen sırası korunur).
  *  • #pythia yalnız `ctx.brand` ve `allowBrand` iken, bir yer alır.
- *  • Artan yerler sırayla: kalan topical → kalan specific → evergreen.
+ *  • Artan yerler sırayla: kalan specific → evergreen → kalan topical.
  */
 export function topicalHashtags(ctx: TopicalContext, cap: number, allowBrand = false): string[] {
   const brand = allowBrand && ctx.brand && cap >= 5 ? 1 : 0;
@@ -757,7 +774,9 @@ export function topicalHashtags(ctx: TopicalContext, cap: number, allowBrand = f
   };
   ctx.specific.slice(0, specTake).forEach(push);
   ctx.topical.slice(0, reserve).forEach(push);
-  const rest = [...ctx.topical.slice(reserve), ...ctx.specific.slice(specTake), ...ctx.evergreen];
+  // Artan yerler: kalan video etiketleri → evergreen → kalan gök/takvim (gök zaten ayrılan payı aldı;
+  // fazlası evergreen'in önüne geçip etiket setini tek renkli yapmasın).
+  const rest = [...ctx.specific.slice(specTake), ...ctx.evergreen, ...ctx.topical.slice(reserve)];
   rest.forEach(push);
   if (brand) picked.push(BRAND_TAG);
   return picked.slice(0, cap);
@@ -771,7 +790,7 @@ export function describeTopical(ctx: TopicalContext, tags: string[]): string {
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────
-if (process.argv[1]?.endsWith("topical.ts")) {
+if (/[\\/]topical\.ts$/.test(process.argv[1] ?? "")) {
   const arg = (k: string) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : undefined);
   const date = arg("--date") ?? istanbulDate(new Date());
   const category = arg("--category") ?? "zodiac";
