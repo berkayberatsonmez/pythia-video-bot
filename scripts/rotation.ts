@@ -231,7 +231,7 @@ const SEQUENCE = buildSequence();
 const SEQUENCE_OFFSET = 49;
 
 // Gün numarası — epoch'tan bu yana gün sayısı (UTC)
-function dayNumber(): number {
+export function dayNumber(): number {
   return Math.floor(Date.now() / 86400000);
 }
 

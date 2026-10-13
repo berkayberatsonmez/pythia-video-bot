@@ -13,7 +13,7 @@ import type { TarotCard } from "./data/tarot-cards";
 import {
   GOLD,
   BG_GRADIENT,
-  StarField,
+  ThemedBackdrop,
   BackgroundMusic,
   MeaningCard,
   Question,
@@ -214,7 +214,7 @@ export const TarotVideo: React.FC<TarotVideoProps> = ({ card, voiceover, tiktokC
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
-      <StarField />
+      <ThemedBackdrop />
       {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 

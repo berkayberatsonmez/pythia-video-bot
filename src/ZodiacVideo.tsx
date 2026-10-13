@@ -12,7 +12,7 @@ import type { ZodiacSign } from "./data/zodiac-signs";
 import {
   GOLD,
   BG_GRADIENT,
-  StarField,
+  ThemedBackdrop,
   BackgroundMusic,
   MeaningCard,
   Question,
@@ -220,7 +220,7 @@ export const ZodiacVideo: React.FC<ZodiacVideoProps> = ({ sign, voiceover, tikto
 
   return (
     <AbsoluteFill style={{ background: BG_GRADIENT }}>
-      <StarField />
+      <ThemedBackdrop />
       {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 

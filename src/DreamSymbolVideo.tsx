@@ -11,7 +11,7 @@ import {
 } from "remotion";
 import type { DreamSymbol } from "./data/dream-symbols";
 import { SymbolIcon } from "./components/SymbolIcon";
-import { BackgroundMusic } from "./components/shared";
+import { BackgroundMusic, ThemedBackdrop } from "./components/shared";
 import { type Voiceover, getSegs, VoiceTrack } from "./components/voiceover";
 
 const GOLD = "#D4A843";
@@ -466,7 +466,7 @@ export const DreamSymbolVideo: React.FC<DreamSymbolVideoProps> = ({
           "linear-gradient(180deg, #09071A 0%, #1a0a2e 50%, #2a1845 100%)",
       }}
     >
-      <StarField />
+      <ThemedBackdrop base={<StarField />} />
       {!tiktokClean && <BackgroundMusic maxVolume={voiceover ? 0.12 : 0.45} />}
       {voiceover && <VoiceTrack vo={voiceover} />}
 
