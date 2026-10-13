@@ -109,8 +109,8 @@ jobs:
             echo "▶ Zamanlı (GitHub cron, yedek): $SCHED"
             case "$SCHED" in
               "41 3 * * *") npm run rotation -- --upload --slot morning ;; # YT 1/gün (retention)
-              "7 10 * * *") npm run rotation -- --instagram --slot morning ;;
-              "7 18 * * *") npm run rotation -- --instagram --slot evening ;;
+              "7 10 * * *") npm run rotation -- --instagram --slot morning --backup ;; # slot-guard.ts
+              "7 18 * * *") npm run rotation -- --instagram --slot evening --backup ;;
               *)            echo "⚠️ Bilinmeyen schedule ($SCHED) — atlanıyor" ;;
             esac
           else
