@@ -16,6 +16,7 @@ import { getManifestById } from "../src/data/manifestation";
 import { getRankingById } from "../src/data/zodiac-rankings";
 import { getBehaviorById } from "../src/data/zodiac-behaviors";
 import { getCompatibilityById } from "../src/data/zodiac-compatibility";
+import { skyCardById, skyEventById } from "./sky-events";
 
 export type Narration = {
   intro: string;
@@ -70,6 +71,31 @@ function fromMeanings(
     m3: clean(`${ORD[2]}. ${meanings[2].title}. ${firstSentence(meanings[2].desc)}`),
     close: clean(close),
   };
+}
+
+// Gök Gündemi kancası (sesli): tarih "24 EKİM" → "24 Ekim".
+function skyIntro(kind: string, planet: string, sign: string, dateUp: string, night: boolean): string {
+  const [d, mUp] = dateUp.split(" ");
+  const date = `${d} ${mUp.charAt(0)}${mUp.slice(1).toLocaleLowerCase("tr")}`;
+  const when = night ? "Bu gece" : "Bugün";
+  switch (kind) {
+    case "retro-pre":
+      return `Yarın, ${date}, ${planet} retrosu ${sign} burcunda başlıyor. Peki bu ne demek?`;
+    case "retro-start":
+      return `Bugün ${planet} retrosu ${sign} burcunda başlıyor. Peki bu ne demek?`;
+    case "retro-mid":
+      return `${planet} retrosu hâlâ sürüyor. Bu dönemde neye dikkat etmekte fayda var?`;
+    case "retro-end":
+      return `${planet} retrosu bugün bitiyor ve ${sign} burcunda düz harekete geçiyor.`;
+    case "full-moon":
+      return `${when} Dolunay, ${sign} burcunda. Peki bu ne demek?`;
+    case "new-moon":
+      return `${when} Yeniay, ${sign} burcunda. Peki bu ne demek?`;
+    case "lunar-eclipse":
+      return `${when} Ay tutulması var, ${sign} burcunda. Peki bu ne demek?`;
+    default:
+      return `Bugün Güneş tutulması var, ${sign} burcunda. Peki bu ne demek?`;
+  }
 }
 
 export function buildNarration(category: string, id: string): Narration | null {
@@ -148,6 +174,21 @@ export function buildNarration(category: string, id: string): Narration | null {
         m2: clean(c.beats[1]),
         m3: clean(c.beats[2]),
         close: clean(`${c.question} ${CLOSE_CTA}`),
+      };
+    }
+    case "sky": {
+      const c = skyCardById(id);
+      const e = skyEventById(id);
+      if (!c || !e) return null;
+      const intro = skyIntro(c.kind, c.planetName, c.signName, c.dateLabel, e.hour >= 12);
+      return {
+        intro: clean(intro),
+        m1: clean(c.theme.desc),
+        m2: clean(
+          `En çok hissedebilecek üç burç. ${c.affected.map((a) => `${a.signName}: ${a.line}`).join(" ")}`,
+        ),
+        m3: clean(`Sakin bir ipucu. ${c.tip}`),
+        close: clean(`${c.question} Günlük burç yorumunu Paytia'da oku, profildeki linkte.`),
       };
     }
     case "number": {
