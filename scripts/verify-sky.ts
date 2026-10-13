@@ -17,7 +17,7 @@ import {
   skyEventById,
   DAY_MS,
 } from "./sky-events";
-import { buildSequence, getVideosForDay, SKY_ANCHOR_DAY } from "./rotation";
+import { buildSequence, getVideosForDay, SEQUENCE_OFFSET, SKY_ANCHOR_DAY } from "./rotation";
 
 let fail = 0;
 const check = (ok: boolean, msg: string) => {
@@ -92,7 +92,7 @@ const seq = buildSequence();
 const N = 500;
 let skyDays = 0;
 let bad = 0;
-let nextIdx = SKY_ANCHOR_DAY * 2 + 49; // eski formülün çapa günündeki indeksi
+let nextIdx = SKY_ANCHOR_DAY * 2 + SEQUENCE_OFFSET; // eski formülün çapa günündeki indeksi
 for (let d = SKY_ANCHOR_DAY; d < SKY_ANCHOR_DAY + N; d++) {
   const [m, e] = getVideosForDay(d, seq);
   const used: string[] = [`${m.category}:${m.id}`];
@@ -109,7 +109,7 @@ for (let d = SKY_ANCHOR_DAY; d < SKY_ANCHOR_DAY + N; d++) {
 }
 check(bad === 0, `rotasyon ${N} gün: öğe atlanmadı/kaybolmadı, sabah≠akşam (SkyEvent'li gün: ${skyDays})`);
 const pre = getVideosForDay(SKY_ANCHOR_DAY - 5, seq);
-check(pre[0].id === seq[((SKY_ANCHOR_DAY - 5) * 2 + 49) % seq.length].id, "çapa öncesi gün eski formülle aynı");
+check(pre[0].id === seq[((SKY_ANCHOR_DAY - 5) * 2 + SEQUENCE_OFFSET) % seq.length].id, "çapa öncesi gün eski formülle aynı");
 check(getVideosForDay(SKY_ANCHOR_DAY + 3, seq, false)[1].poolKey !== "sky", "withSky=false SkyEvent üretmez");
 
 // ─── Özet ────────────────────────────────────────────────────────────────
