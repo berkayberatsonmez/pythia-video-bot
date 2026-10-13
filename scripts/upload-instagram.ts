@@ -12,7 +12,7 @@
 
 import { spawnSync } from "node:child_process";
 import { basename } from "node:path";
-import { buildInstagramCaption, buildFirstComment } from "./metadata";
+import { buildInstagramCaption, buildFirstComment, optsFromContext, type MetaOpts } from "./metadata";
 import { trackPublication } from "./analytics/ledger";
 import { publicationContent, type ContentContext } from "./analytics/content";
 
@@ -85,8 +85,8 @@ async function alreadyPostedRecently(hookLine: string): Promise<boolean> {
 }
 
 // ─── IG caption: Instagram'a ÖZEL üretici (metadata.ts) ───────────────────
-export function buildReelCaption(category: string, id: string): string {
-  return buildInstagramCaption(category, id);
+export function buildReelCaption(category: string, id: string, opts?: MetaOpts): string {
+  return buildInstagramCaption(category, id, opts);
 }
 
 // ─── gh CLI çağrısı (shell-safe) ─────────────────────────────────────────
@@ -174,8 +174,9 @@ async function sendReelFromFile(
   category: string,
   id: string,
   tag: string,
+  opts?: MetaOpts,
 ): Promise<string> {
-  const caption = buildReelCaption(category, id);
+  const caption = buildReelCaption(category, id, opts);
 
   // Mükerrer koruması: aynı kanca son 20 saatte paylaşıldıysa atla
   const hookLine = caption.split("\n")[0].trim();
@@ -212,7 +213,7 @@ export async function postReelFromFile(
       provider: "instagram",
       content: publicationContent("instagram", category, id, context),
     },
-    () => sendReelFromFile(videoPath, category, id, tag),
+    () => sendReelFromFile(videoPath, category, id, tag, optsFromContext(context)),
     (result) =>
       result === "skipped"
         ? { state: "skipped", issues: ["duplicate"] }

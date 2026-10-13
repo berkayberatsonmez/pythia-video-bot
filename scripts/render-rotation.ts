@@ -212,7 +212,7 @@ async function main() {
   if (DO_TIKTOK) {
     console.log(`\n🎵 TikTok drafts'a yükleniyor...`);
     for (const { v, path } of rendered) {
-      const pid = await postToTikTokFromFile(path, v.category, v.id);
+      const pid = await postToTikTokFromFile(path, v.category, v.id, v.slot);
       if (pid) {
         console.log(`   ✅ ${v.label} → TikTok drafts (publish_id ${pid})`);
       } else {

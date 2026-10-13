@@ -22,7 +22,7 @@ import { readFileSync, existsSync, writeFileSync, createReadStream } from "node:
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { google } from "googleapis";
-import { buildMetadata } from "./metadata";
+import { buildMetadata, optsFromContext, type MetaOpts } from "./metadata";
 import { trackPublication } from "./analytics/ledger";
 import { publicationContent, type ContentContext } from "./analytics/content";
 
@@ -146,10 +146,11 @@ async function sendVideoFile(
   id: string,
   privacy: string,
   publishAt?: string, // ISO 8601 UTC — verilirse zamanlı yayın (private + publishAt)
+  opts?: MetaOpts,
 ): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const youtube = google.youtube({ version: "v3", auth: auth as any });
-  const metadata = buildMetadata(category, id);
+  const metadata = buildMetadata(category, id, opts);
 
   // Zamanlı yayın için YouTube private + publishAt ister
   const status: Record<string, unknown> = {
@@ -209,7 +210,7 @@ export async function uploadVideoFile(
       provider: "youtube",
       content: publicationContent("youtube", category, id, context),
     },
-    () => sendVideoFile(auth, videoPath, category, id, privacy, publishAt),
+    () => sendVideoFile(auth, videoPath, category, id, privacy, publishAt, optsFromContext(context)),
     (url) => {
       let platformId: string | undefined;
       try {
