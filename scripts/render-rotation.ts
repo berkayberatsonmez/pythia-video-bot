@@ -14,7 +14,8 @@ import { tmpdir } from "node:os";
 import { dayNumber, getTodaysVideos, type SelectedVideo } from "./rotation";
 import { themeFor, voiceFor } from "./variety";
 import { authorize, uploadVideoFile } from "./upload-youtube";
-import { postReelFromFile } from "./upload-instagram";
+import { postReelFromFile, recentPostTimestamps } from "./upload-instagram";
+import { slotSkipReason } from "./slot-guard";
 import { postToTikTokFromFile } from "./upload-tiktok";
 import { buildVoiceover } from "./voiceover-build";
 import { TTS_VOICE } from "./tts";
@@ -30,6 +31,7 @@ const DO_UPLOAD = process.argv.includes("--upload");
 const DO_INSTAGRAM = process.argv.includes("--instagram");
 const DO_TIKTOK = process.argv.includes("--tiktok");
 const UPLOAD_NOW = process.argv.includes("--now");
+const IS_BACKUP = process.argv.includes("--backup"); // GitHub cron yedeği (slot-guard.ts)
 // --slot morning|evening → sadece o slotun videosunu işle (IG zamanlı paylaşım için)
 const SLOT_FILTER = process.argv.includes("--slot")
   ? process.argv[process.argv.indexOf("--slot") + 1]
@@ -118,6 +120,22 @@ async function main() {
   if (SLOT_FILTER) {
     picks = picks.filter((v) => v.slot === SLOT_FILTER);
     console.log(`🎯 Slot filtresi: ${SLOT_FILTER} → ${picks.length} video`);
+  }
+
+  // Slot koruması (slot-guard.ts): IG slotu günde bir kez; geciken yedek
+  // cron dispatch'in attığı slotu ikinci bir videoyla tekrar atmaz.
+  // Render'dan ÖNCE — TikTok drafts'ı da mükerrer olmasın, boşuna render da yok.
+  if (DO_INSTAGRAM && (SLOT_FILTER === "morning" || SLOT_FILTER === "evening") && !process.env.IG_FORCE) {
+    const reason = slotSkipReason({
+      slot: SLOT_FILTER,
+      nowMs: Date.now(),
+      postTimestamps: await recentPostTimestamps(),
+      backup: IS_BACKUP,
+    });
+    if (reason) {
+      console.log(`⏭️ Slot koruması: ${reason} — hiçbir şey yayınlanmadı.`);
+      return;
+    }
   }
 
   console.log(`\n🌙 Pythia Rotasyon — ${todayStamp()}`);

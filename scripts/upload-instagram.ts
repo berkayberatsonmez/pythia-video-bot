@@ -84,6 +84,16 @@ async function alreadyPostedRecently(hookLine: string): Promise<boolean> {
   }
 }
 
+/** Son gönderilerin zaman damgaları (slot koruması, slot-guard.ts); okunamazsa null. */
+export async function recentPostTimestamps(): Promise<string[] | null> {
+  try {
+    const res = await igGet("me/media", { fields: "timestamp", limit: "10" });
+    return (res.data || []).map((m: any) => String(m.timestamp ?? "")).filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
 // ─── IG caption: Instagram'a ÖZEL üretici (metadata.ts) ───────────────────
 export function buildReelCaption(category: string, id: string, opts?: MetaOpts): string {
   return buildInstagramCaption(category, id, opts);
