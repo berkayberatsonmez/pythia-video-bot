@@ -47,6 +47,25 @@ jobs:
       - name: Remotion tarayıcısını hazırla
         run: npx remotion browser ensure
 
+      # Güncel konu girdisi (opsiyonel): Google Trends TR RSS. 10 sn zaman aşımı, hata TOLERE edilir —
+      # alınamazsa dosya yazılmaz ve topical.ts trend olmadan (gök + takvim + evergreen) devam eder.
+      # scripts/topical.ts yalnız astro/tarot/rüya sözlüğüne uyan terimi kullanır; dosya 18 saatten eskiyse yok sayar.
+      - name: Google Trends TR (opsiyonel, hata tolere edilir)
+        continue-on-error: true
+        run: |
+          mkdir -p out/trends
+          rm -f out/trends/google-tr.rss out/trends/google-tr.rss.tmp
+          if curl -fsSL --max-time 10 --retry 0 -A "Mozilla/5.0 (compatible; PythiaBot/1.0)" \
+               "https://trends.google.com/trending/rss?geo=TR" -o out/trends/google-tr.rss.tmp \
+             && grep -q "<rss" out/trends/google-tr.rss.tmp; then
+            mv out/trends/google-tr.rss.tmp out/trends/google-tr.rss
+            echo "✓ Trend RSS alındı ($(grep -o '<item' out/trends/google-tr.rss | wc -l) öğe)"
+          else
+            echo "::warning::Google Trends alınamadı — trend girdisi olmadan devam ediliyor"
+            rm -f out/trends/google-tr.rss.tmp
+          fi
+          exit 0
+
       - name: Bugünün klibini seç (rotasyon — deterministik, gün bazlı)
         id: pick
         run: |
