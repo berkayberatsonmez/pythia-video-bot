@@ -23,4 +23,8 @@ assert.equal(slotSkipReason({ slot: "morning", nowMs: t("2026-10-13T10:07:00Z"),
 assert.ok(slotSkipReason({ slot: "morning", nowMs: t("2026-10-13T16:00:00Z"), postTimestamps: null, backup: true }));
 // 8) Sabah slotu olmadan akşam (sabah düştü) → akşam yine yayınlar
 assert.equal(slotSkipReason({ slot: "evening", nowMs: t("2026-10-13T18:07:00Z"), postTimestamps: [], backup: false }), null);
-console.log("✓ verify:slot-guard — 11 durum");
+// 9) 14 Eki: akşam yedeği 21:34 UTC (= 00:34 TR, yeni TR günü, 0 gönderi) → ATLAMALI
+assert.ok(slotSkipReason({ slot: "evening", nowMs: t("2026-10-14T21:34:00Z"), postTimestamps: ["2026-10-14T10:08:00Z", "2026-10-14T18:08:00Z"], backup: true }));
+// 10) Asıl yol (dispatch) bu saatte yine karar sayıma bırakılır
+assert.equal(slotSkipReason({ slot: "morning", nowMs: t("2026-10-14T21:34:00Z"), postTimestamps: [], backup: false }), null);
+console.log("✓ verify:slot-guard — 13 durum");

@@ -51,6 +51,11 @@ export function slotSkipReason(i: GuardInput): string | null {
     if (hourUtc < BACKUP_CRON_HOUR_UTC[i.slot]) {
       return `yedek cron dünkü tetik (şimdi ${hourUtc}:xx UTC < ${BACKUP_CRON_HOUR_UTC[i.slot]}:07) — gün geçti`;
     }
+    // 21:00 UTC = 00:00 TR: yedek kendi TR gününü geçti. Sayım yeni güne
+    // bakacağı için boş görür ve atardı (14 Eki 21:34 UTC akşam yedeği).
+    if (hourUtc >= 21) {
+      return `yedek cron TR gece yarısını geçti (şimdi ${hourUtc}:xx UTC ≥ 21:00) — gün geçti`;
+    }
   }
   if (i.postTimestamps === null) {
     // Okunamadıysa: asıl yol yayınlar (eski davranış), yedek risk almaz.
