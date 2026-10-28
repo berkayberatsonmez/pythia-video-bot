@@ -1,0 +1,34 @@
+name: Onaylı Yorum Yanıtları
+
+# feat/manual-replies dalına push: replies/approved.json varsa ve "approved": true ise POST, yoksa LIST.
+on:
+  push:
+    branches: [feat/manual-replies]
+    paths: [replies/**, scripts/manual-replies.ts, .github/workflows/manual-replies.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-replies
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - env:
+          IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
+        run: |
+          if [ -f replies/approved.json ] && grep -q '"approved": *true' replies/approved.json; then
+            npx tsx scripts/manual-replies.ts post
+          else
+            npx tsx scripts/manual-replies.ts list
+          fi
