@@ -1,36 +1,39 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// ⚠️  DURUM: BEKLEMEDE — kod çalışıyor, Meta izin vermiyor.
-//
-//   Teşhis (2026-08-29, debug çalıştırmalarıyla kanıtlandı):
-//     • 40 gönderi, comments_count toplam 212 → sayı okunuyor
-//     • /{media}/comments her seferinde data:[] + DOLU paging.cursors
-//     • /{media}?fields=comments{...} → comments alanı sessizce düşüyor
-//     • instagram_business_manage_comments durumu: "Ready for testing"
-//       (= Standard Access: yalnız app rolü olan kişilerin verisi görünür)
-//   Yorum yazanlar tester değil → metinleri filtreleniyor, sayı geliyor.
-//
-//   Advanced Access için Meta şunları istiyor: Tech Provider olmak (GERİ
-//   ALINAMAZ) + business verification (şirket + vergi no) + access
-//   verification + App Review. Şirket olmadığı için başvurulamıyor.
-//
-//   Workflow cron'u bu yüzden KAPALI. Kod ve metin havuzu hazır duruyor;
-//   advanced access alınırsa cron'u aç, başka değişiklik gerekmiyor.
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
 // reply-comments.ts — Instagram yorumlarına otomatik yanıt
 //
-// Akış (graph.instagram.com, upload-instagram.ts ile aynı token):
-//   1) GET /me                   → kendi username'imiz
-//   2) GET /me/media             → son N gönderi (caption ile)
-//   3) GET /{media}/comments     → yorumlar + mevcut yanıtlar
-//   4) POST /{comment}/replies   → uygun olanlara yanıt
+// DURUM (2026-10-28): Facebook Login rotasına geçildi; ESKİ "BEKLEMEDE" durumu bitti.
+//
+//   Eski sorun (2026-08-29): Instagram Login API'sinde (graph.instagram.com,
+//   IG_ACCESS_TOKEN) Meta, Advanced Access olmadan başkalarının yorum METNİNİ
+//   gizliyordu (comments_count geliyor ama /comments data:[] dönüyordu).
+//   Advanced Access ise Tech Provider + business verification istiyor.
+//
+//   Çözüm: "Instagram API with Facebook Login". Instagram business hesabı bir
+//   Facebook Sayfasına bağlı; Sayfa erişim token'ı ile graph.facebook.com
+//   üzerinden okuma/yanıt yapılıyor. 2026-10-28 akşamı DOĞRULANDI:
+//     GET /17841442281703919/media?fields=caption,comments_count,
+//         comments{text,username,timestamp}   (v26.0)
+//   → başkalarının yorum metinleri döndü.
+//
+//   Hesap: @pythiamystic, IG business id 17841442281703919 (gizli değil),
+//   bağlı Facebook Sayfası 1399339156599999. Süresiz Sayfa token'ı GitHub
+//   secret'ı IG_PAGE_TOKEN'dır (sahibi ekler).
+//
+//   ⚠️ Workflow cron'u HÂLÂ KAPALI. Bir insan `reply:dry` (workflow_dispatch,
+//   dry=true) çıktısını kontrol edip onaylamadan açılmaz. Açmak için
+//   reply-comments.yml'deki schedule bloğunun yorumunu kaldır.
+//
+// Akış (https://graph.facebook.com/v26.0, token: IG_PAGE_TOKEN):
+//   1) GET /{ig-user-id}?fields=username       → kendi username'imiz
+//   2) GET /{ig-user-id}/media                 → son N gönderi (caption ile)
+//   3) GET /{media}/comments                   → yorumlar + mevcut yanıtlar
+//   4) POST /{comment}/replies (message=...)   → uygun olanlara yanıt
+//
+// ENV: IG_PAGE_TOKEN (zorunlu) · IG_FB_USER_ID (isteğe bağlı,
+//      varsayılan 17841442281703919)
 //
 // DEDUP DURUMSUZ: yorumun replies listesinde kendi username'imiz varsa atlanır.
 // Dosya/KV tutmuyoruz → Actions cache'i ya da geri commit gerekmiyor.
-//
-// İZİN: kendi medyamıza yorum atabildiğimiz için token'da
-// instagram_business_manage_comments zaten var. YENİ İZİN GEREKMİYOR.
 //
 // Kullanım:
 //   tsx scripts/reply-comments.ts --dry   → hiçbir şey göndermez, ne yapacağını yazar
@@ -39,15 +42,16 @@
 
 import { createHash } from "node:crypto";
 
-const IG_BASE = "https://graph.instagram.com";
+const GRAPH_BASE = "https://graph.facebook.com/v26.0";
+const DEFAULT_IG_USER_ID = "17841442281703919"; // @pythiamystic IG business id (gizli değil)
 
 // ─── Ayarlar ──────────────────────────────────────────────────────────────
-// Instagram Login API'de "tüm medyadaki son yorumlar" diye tek bir uç YOK.
+// Graph API'de "tüm medyadaki son yorumlar" diye tek bir uç YOK.
 // Gönderi gönderi dolaşmak zorundayız → son N gönderiyi tarıyoruz.
 // Günde ~2 paylaşımda 40 gönderi ≈ son 3 hafta. Daha eskisine yorum gelirse
 // kaçar; gerçek zamanlı istiyorsak Meta webhook'u gerekir (bkz. dosya sonu).
 const MEDIA_SCAN = 40; // kaç gönderi taransın (sayfalama ile)
-const MEDIA_PAGE = 25; // /me/media sayfa boyutu
+const MEDIA_PAGE = 25; // /media sayfa boyutu
 const COMMENT_PAGES = 4; // gönderi başına en fazla kaç yorum sayfası çekilsin
 const MAX_COMMENT_AGE_DAYS = 30; // bundan eski yorumlara yanıt verilmez
 const MAX_PER_MEDIA = 6; // gönderi başına en fazla kaç yanıt
@@ -107,30 +111,38 @@ const POOLS: Record<string, string[]> = {
 };
 
 // ─── API yardımcıları ─────────────────────────────────────────────────────
+// Token ASLA loglanmaz: hata mesajlarına yalnız yol, HTTP durumu ve Meta'nın
+// error.message/code alanı girer. (paging.next URL'leri token taşır → yazdırılmaz.)
 function token(): string {
-  const t = (process.env.IG_ACCESS_TOKEN || "").replace(/^﻿/, "").trim();
-  if (!t) throw new Error("IG_ACCESS_TOKEN env değişkeni tanımlı değil!");
+  const t = (process.env.IG_PAGE_TOKEN || "").replace(/^\uFEFF/, "").trim();
+  if (!t) throw new Error("IG_PAGE_TOKEN env değişkeni tanımlı değil!");
   return t;
+}
+
+function igUserId(): string {
+  return (process.env.IG_FB_USER_ID || "").trim() || DEFAULT_IG_USER_ID;
+}
+
+async function parse(res: Response, what: string): Promise<any> {
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok || json?.error) {
+    const err = json?.error;
+    const detail = err ? `${err.message ?? "?"} (code ${err.code ?? "?"}${err.error_subcode ? `/${err.error_subcode}` : ""})` : "yanıt gövdesi okunamadı";
+    throw new Error(`${what} → HTTP ${res.status}: ${detail}`);
+  }
+  return json;
 }
 
 async function igGet(path: string, params: Record<string, string> = {}): Promise<any> {
   const qs = new URLSearchParams({ ...params, access_token: token() });
-  const res = await fetch(`${IG_BASE}/${path}?${qs}`);
-  const json: any = await res.json().catch(() => ({}));
-  if (!res.ok || json?.error) {
-    throw new Error(`IG GET ${path} → ${JSON.stringify(json?.error ?? json)}`);
-  }
-  return json;
+  const res = await fetch(`${GRAPH_BASE}/${path}?${qs}`);
+  return parse(res, `GET ${path}`);
 }
 
 async function igPost(path: string, params: Record<string, string>): Promise<any> {
   const body = new URLSearchParams({ ...params, access_token: token() });
-  const res = await fetch(`${IG_BASE}/${path}`, { method: "POST", body });
-  const json: any = await res.json().catch(() => ({}));
-  if (!res.ok || json?.error) {
-    throw new Error(`IG POST ${path} → ${JSON.stringify(json?.error ?? json)}`);
-  }
-  return json;
+  const res = await fetch(`${GRAPH_BASE}/${path}`, { method: "POST", body });
+  return parse(res, `POST ${path}`);
 }
 
 /**
@@ -145,14 +157,11 @@ async function igGetAll(
   maxItems: number,
 ): Promise<any[]> {
   const out: any[] = [];
-  let url = `${IG_BASE}/${path}?${new URLSearchParams({ ...params, access_token: token() })}`;
+  let url = `${GRAPH_BASE}/${path}?${new URLSearchParams({ ...params, access_token: token() })}`;
 
   for (let page = 0; page < maxPages && url && out.length < maxItems; page++) {
     const res = await fetch(url);
-    const json: any = await res.json().catch(() => ({}));
-    if (!res.ok || json?.error) {
-      throw new Error(`IG GET ${path} → ${JSON.stringify(json?.error ?? json)}`);
-    }
+    const json = await parse(res, `GET ${path}`);
     out.push(...(json.data ?? []));
     url = json.paging?.next ?? "";
   }
@@ -211,14 +220,14 @@ async function probeComments(mediaId: string): Promise<void> {
     ["uc / id", `${mediaId}/comments?fields=id`],
     ["uc / id,text", `${mediaId}/comments?fields=id,text`],
     ["uc / id,text,username", `${mediaId}/comments?fields=id,text,username`],
-    ["uc / id,text,from", `${mediaId}/comments?fields=id,text,from`],
+    ["uc / replies", `${mediaId}/comments?fields=id,text,username,timestamp,replies{username,text}`],
     ["medyadan ic ice", `${mediaId}?fields=comments_count,comments{id,text,username}`],
     ["medyadan ic ice / alansiz", `${mediaId}?fields=comments`],
   ];
   console.log("  -- TESHIS MERDIVENI --");
   for (const [label, path] of tries) {
     const sep = path.includes("?") ? "&" : "?";
-    const url = `${IG_BASE}/${path}${sep}access_token=${encodeURIComponent(token())}`;
+    const url = `${GRAPH_BASE}/${path}${sep}access_token=${encodeURIComponent(token())}`;
     try {
       const res = await fetch(url);
       const body = await res.text();
@@ -235,23 +244,24 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
 async function run(dry: boolean, debug: boolean): Promise<void> {
-  const me = await igGet("me", { fields: "id,username,account_type" });
+  const uid = igUserId();
+  const me = await igGet(uid, { fields: "username" });
   const myName = String(me.username || "");
   if (debug) {
     // Token PARMAK IZI - token degil, hash. Secret gercekten degisti mi anlamak icin.
     const fp = createHash("sha256").update(token()).digest("hex").slice(0, 10);
     console.log(`   token parmak izi: ${fp} | uzunluk: ${token().length}`);
-    console.log(`   hesap tipi: ${me.account_type ?? "?"} | id: ${me.id ?? "?"}`);
+    console.log(`   ig user id: ${uid}`);
   }
   console.log(`👤 Hesap: @${myName}${dry ? "   (DRY RUN — hiçbir şey gönderilmeyecek)" : ""}`);
 
   const media = await igGetAll(
-    "me/media",
+    `${uid}/media`,
     {
       // comments_count MEDYA alanı — yorum ucundan bağımsız okunur.
       // Teşhis anahtarı: count > 0 ama uç boş dönüyorsa sorun izinde/uçta,
       // count = 0 ise gönderide gerçekten yorum yok.
-      fields: "id,caption,timestamp,permalink,media_type,comments_count",
+      fields: "id,caption,comments_count,timestamp",
       limit: String(MEDIA_PAGE),
     },
     Math.ceil(MEDIA_SCAN / MEDIA_PAGE),
@@ -268,15 +278,15 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
     console.log("-- DEBUG: en yeni 5 gonderi --");
     for (const m of media.slice(0, 5) as any[]) {
       console.log(
-        `   ${m.id} | ${m.media_type ?? "?"} | ${String(m.timestamp).slice(0, 16)} | ` +
-          `comments_count=${m.comments_count ?? "?"} | ${m.permalink ?? "-"}`,
+        `   ${m.id} | ${String(m.timestamp).slice(0, 16)} | ` +
+          `comments_count=${m.comments_count ?? "?"} | ${String(m.caption || "").slice(0, 40).replace(/\n/g, " ")}`,
       );
     }
     console.log("------------------------------");
   } else if (media.length) {
     const m0: any = media[0];
     console.log(
-      `   en yeni: ${m0.id} ${m0.media_type ?? "?"} ${String(m0.timestamp).slice(0, 10)} ` +
+      `   en yeni: ${m0.id} ${String(m0.timestamp).slice(0, 10)} ` +
         `comments_count=${m0.comments_count ?? "?"}`,
     );
   }
@@ -298,7 +308,7 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
     try {
       comments = await igGetAll(
         `${m.id}/comments`,
-        { fields: "id,text,username,timestamp,replies{id,username}", limit: "50" },
+        { fields: "id,text,username,timestamp,replies{username,text}", limit: "50" },
         COMMENT_PAGES,
         COMMENT_PAGES * 50,
       );
