@@ -3,20 +3,13 @@ name: Pythia IG Yorum Yanıtla
 # Instagram yorumlarına otomatik yanıt (scripts/reply-comments.ts).
 # Remotion/render YOK → hafif iş, Chrome bağımlılığı gerekmiyor.
 #
-# Zamanlama (UTC, TR = UTC+3): video slotlarıyla çakışmasın diye araya alındı.
-#   12:20 → öğleden sonra turu   ·   20:20 → akşam turu
-# Bu repoda cron gecikebiliyor (bkz. daily-video.yml notu); sorun değil,
-# script zaten cevaplanmış yorumları API'den görüp atlıyor.
-# ⚠️ CRON KAPALI — Facebook Login rotasına geçildi (IG_PAGE_TOKEN, graph.facebook.com;
-# 2026-10-28'de yorum metinlerinin okunduğu doğrulandı). Bir insan manuel
-# kuru çalıştırmanın (dry=true) çıktısını kontrol etmeden zamanlama AÇILMAZ.
-# Açmak için aşağıdaki schedule bloğunun yorumunu kaldır.
-#
-# on:
-#   schedule:
-#     - cron: "20 12 * * *"
-#     - cron: "20 20 * * *"
+# Zamanlama: 2 saatte bir, 05:00-21:00 UTC (TR 08:00-24:00); cron "17 5-21/2 * * *".
+# GitHub cron'u yoğun saatlerde gecikebilir (dakikalar, bazen daha fazla); sorun değil,
+# script cevaplanmış yorumları API'den görüp atlıyor. Zamanlanmış koşular GERÇEK gönderir;
+# manuel tetiklemede dry varsayılan true.
 on:
+  schedule:
+    - cron: "17 5-21/2 * * *"
   workflow_dispatch:
     inputs:
       dry:
@@ -51,7 +44,7 @@ jobs:
       - name: Yorumları yanıtla
         env:
           IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           set -o pipefail
           # Manuel tetiklemede varsayılan KURU; cron'da her zaman gerçek gönderim.

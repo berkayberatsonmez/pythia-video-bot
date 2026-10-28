@@ -19,9 +19,7 @@
 //   bağlı Facebook Sayfası 1399339156599999. Süresiz Sayfa token'ı GitHub
 //   secret'ı IG_PAGE_TOKEN'dır (sahibi ekler).
 //
-//   ⚠️ Workflow cron'u HÂLÂ KAPALI. Bir insan `reply:dry` (workflow_dispatch,
-//   dry=true) çıktısını kontrol edip onaylamadan açılmaz. Açmak için
-//   reply-comments.yml'deki schedule bloğunun yorumunu kaldır.
+//   Workflow cron'u (reply-comments.yml) açıktır: 2 saatte bir gerçek yanıt gönderir.
 //
 // Akış (https://graph.facebook.com/v26.0, token: IG_PAGE_TOKEN):
 //   1) GET /{ig-user-id}?fields=username       → kendi username'imiz
@@ -31,12 +29,12 @@
 //
 // YANIT ÜRETİMİ (2026-10-28): sabit havuz yerine LLM. Her yoruma, gönderi başlığı +
 //   kategorisi + yorum + KODDA hesaplanan olgular (burç, yaşam yolu sayısı) verilerek
-//   OpenAI'dan 1–2 cümlelik, uygulamaya yumuşak yönlendiren bir yanıt istenir.
+//   Anthropic Claude'dan (Messages API) 1–2 cümlelik, uygulamaya yumuşak yönlendiren bir yanıt istenir.
 //   Model sayı hesaplamaz; yaşam yolu kodda hesaplanır (reply-helpers.ts).
 //   Üretim başarısızsa o yorum atlanır (log), koşu çökmez.
 //
-// ENV: IG_PAGE_TOKEN (zorunlu) · OPENAI_API_KEY (zorunlu; yoksa gerçek modda hata,
-//      kuru modda yalnız ne yapılacağı yazılır) · OPENAI_MODEL (varsayılan gpt-4o-mini)
+// ENV: IG_PAGE_TOKEN (zorunlu) · ANTHROPIC_API_KEY (zorunlu; yoksa gerçek modda hata,
+//      kuru modda yalnız ne yapılacağı yazılır) · ANTHROPIC_MODEL (varsayılan claude-sonnet-5-5)
 //      · REPLY_MAX_PER_RUN (varsayılan 20) · IG_FB_USER_ID (isteğe bağlı,
 //      varsayılan 17841442281703919)
 //
@@ -66,8 +64,8 @@ const MAX_COMMENT_AGE_DAYS = 30; // bundan eski yorumlara yanıt verilmez
 const MAX_PER_MEDIA = 6; // gönderi başına en fazla kaç yanıt
 const MAX_TOTAL_DEFAULT = 20; // bir çalıştırmada toplam en fazla kaç yanıt (REPLY_MAX_PER_RUN ile değişir)
 const CAPTION_MAX = 600; // modele giden başlık uzunluğu
-const OPENAI_TIMEOUT_MS = 25000;
-const DEFAULT_MODEL = "gpt-4o-mini";
+const LLM_TIMEOUT_MS = 25000;
+const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 function maxTotal(): number {
   const n = parseInt(process.env.REPLY_MAX_PER_RUN || "", 10);
@@ -94,15 +92,33 @@ export const SYSTEM_PROMPT = `Sen @pythiamystic Instagram hesabının yorum yan�
 SES: Sıcak, gizemli, samimi. Karşındakine "sen" diye hitap et. 1–2 cümle, en fazla ~220 karakter. En fazla 1–2 emoji (🌙 ✨ 🔮 🤍 gibi). Yorumun diliyle yanıtla (varsayılan Türkçe).
 
 İÇERİĞE CEVAP VER:
-- Yorumda burç varsa ("Koç", "Yengeç 🤍" gibi): o burca özel kısa, olumlu bir içgörü ver. "Yükselen" varsa ona da değin.
+- Yorumda burç varsa ("Koç", "Yengeç 🤍" gibi): o burca özel kısa, olumlu bir içgörü ver. "Yükselen" varsa ona da değin. İki burç varsa (çift, eş) ikisinin uyumuna değin.
 - "YAŞAM YOLU SAYISI" verilmişse (doğum tarihi var demektir): o sayıyı AYNEN kullan ve tek cümlelik anlamını söyle. Sayıyı ASLA kendin hesaplama, verilmeyen sayı uydurma.
 - Soru varsa kısaca cevapla.
 - Emoji ya da çok kısa yorum ("Evet", "🔥") ise gönderinin konusuna bağlı sıcak, kısa bir karşılık ver.
 - Gönderi başlığı ve kategorisi bağlamdır; yorumla alakasız şeyler anlatma.
 
-HER YANITI yumuşak ve çeşitli bir uygulama yönlendirmesiyle bitir. URL YAZMA. Örnekler (aynen kopyalama, her seferinde farklı kur): "profildeki linkten Pythia'da rüyanı yorumlat 🌙", "Pythia'da kendi haritana da bakabilirsin, link profilde ✨", "günün kartı için profildeki linke göz at 🔮". Yönlendirmeyi konuya uydur (rüya, tarot, burç, sayı).
+UYGULAMAYI ZATEN KULLANAN KİŞİ: Yorumcu uygulamayı indirdiğini ya da kullandığını söylüyorsa ona "indir" ya da "profildeki linke bak" DEME. Teşekkür et ve kullanmaya devam etmeye davet et: günün kartı, rüya günlüğü ya da mağazada bir yıldız/yorum bırakmak (üçünden birini seç, her seferinde aynısını değil).
 
-YASAKLAR: Kesin kehanet ("kesin olacak" gibi) yok. Sağlık, finans, hukuk tavsiyesi yok. Dini iddia yok. Yapay zekâ ya da bot olduğundan asla söz etme. Kişisel veri isteme (doğum tarihini yorumda zaten paylaşan kişiye teşekkür/değinme serbest). Link, "www", "@" kullanma; kimseyi etiketleme.
+Diğer yanıtları (uygulamayı henüz kullanmayanlar) yumuşak ve çeşitli bir uygulama yönlendirmesiyle bitir. URL YAZMA. Yönlendirmeyi konuya uydur (rüya, tarot, burç, sayı, uyum); "link profilde" demek yeterli, her seferinde aynı kalıbı kullanma.
+
+ÖRNEKLER (ton ve uzunluk için; aynen kopyalama, her yoruma özgü yaz):
+Yorum: Balık
+Yanıt: Balık 🌊 Merkür retrosunda sezgilerin her zamankinden güçlü, rüyalarına dikkat et. Gördüklerini Pythia'da yorumlatabilirsin, link profilde 🌙
+
+Yorum: Yengeç 🤍
+Yanıt: Yengeç 🤍 Retro döneminde geçmişten bir duygu yüzeye çıkabilir, ona nazik davran. Haftalık yorumun Pythia'da, link profilde ✨
+
+Yorum: Ben tabiki terazi❤️
+Yanıt: Terazi ❤️ Romantizmi sanata dönüştüren burç, Venüs'ün çocuğu ✨ Aşk yorumun Pythia'da seni bekliyor, link profilde 🌙
+
+Yorum: Eşim koç ben boğa…
+Yanıt: Koç ile Boğa zorlanır ama pes etmezse en sağlam çiftlerden biri olur 🐂 Kendi uyumunu merak ediyorsan Pythia'da burç uyumuna bak, link profilde 🔮
+
+Yorum: kart çekmek için uygulamayı indirdim çok iyi
+Yanıt: Ne güzel, hoş geldin 🔮 Her gün yeni bir kart seni bekliyor; günün kartını kaçırma ✨
+
+YASAKLAR: Kesin kehanet ("kesin olacak" gibi) yok. Sağlık, finans, hukuk tavsiyesi yok. Dini iddia yok. Yapay zekâ ya da bot olduğundan asla söz etme. Kişisel veri isteme (doğum tarihini yorumda zaten paylaşan kişiye teşekkür/değinme serbest). Link, "www", "@" kullanma; kimseyi etiketleme, kullanıcı adı yazma.
 
 Daha önce bu gönderide verilen yanıtlar listelenirse aynı açılışı, aynı kalıbı ve aynı yönlendirme cümlesini TEKRARLAMA.
 
@@ -138,30 +154,30 @@ export function buildUserMessage(ctx: ReplyCtx): string {
   return parts.join("\n");
 }
 
-async function callOpenAI(userMsg: string): Promise<string> {
+async function callClaude(userMsg: string): Promise<string> {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), OPENAI_TIMEOUT_MS);
+  const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS);
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       signal: ctl.signal,
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${(process.env.OPENAI_API_KEY || "").trim()}`,
+        "x-api-key": (process.env.ANTHROPIC_API_KEY || "").trim(),
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL,
+        model: (process.env.ANTHROPIC_MODEL || "").trim() || DEFAULT_MODEL,
+        max_tokens: 200,
         temperature: 0.8,
-        max_tokens: 120,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMsg },
-        ],
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMsg }],
       }),
     });
     const json: any = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${json?.error?.message ?? "?"}`);
-    return String(json?.choices?.[0]?.message?.content ?? "");
+    if (!res.ok) throw new Error(`Anthropic HTTP ${res.status}: ${json?.error?.message ?? "?"}`);
+    const blocks: any[] = Array.isArray(json?.content) ? json.content : [];
+    return blocks.filter((b) => b?.type === "text").map((b) => String(b.text ?? "")).join("");
   } finally {
     clearTimeout(timer);
   }
@@ -173,7 +189,7 @@ async function generateReply(ctx: ReplyCtx): Promise<{ reply: string | null; err
   let lastErr = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await callOpenAI(msg);
+      const raw = await callClaude(msg);
       const clean = sanitizeReply(raw);
       if (clean) return { reply: clean };
       lastErr = "model çıktısı son kontrolden geçmedi (boş/link/@)";
@@ -305,12 +321,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
 async function run(dry: boolean, debug: boolean): Promise<void> {
-  const hasKey = !!(process.env.OPENAI_API_KEY || "").trim();
+  const hasKey = !!(process.env.ANTHROPIC_API_KEY || "").trim();
   if (!hasKey && !dry) {
-    throw new Error("OPENAI_API_KEY tanımlı değil — gerçek modda yanıt üretilemez, hiçbir şey gönderilmedi.");
+    throw new Error("ANTHROPIC_API_KEY tanımlı değil — gerçek modda yanıt üretilemez, hiçbir şey gönderilmedi.");
   }
   if (!hasKey) {
-    console.log("⚠️  OPENAI_API_KEY yok: kuru çalıştırma yalnızca hangi yorumlara yanıt VERİLECEĞİNİ listeler, yanıt metni üretilmez.");
+    console.log("⚠️  ANTHROPIC_API_KEY yok: kuru çalıştırma yalnızca hangi yorumlara yanıt VERİLECEĞİNİ listeler, yanıt metni üretilmez.");
   }
   const limit = maxTotal();
   const uid = igUserId();
@@ -429,7 +445,7 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
       let message: string;
       if (!hasKey) {
         console.log(`  💬 @${user}: "${text.slice(0, 80)}"`);
-        console.log(`     ↳ (yanıt üretilmedi — OPENAI_API_KEY yok)`);
+        console.log(`     ↳ (yanıt üretilmedi — ANTHROPIC_API_KEY yok)`);
         perMedia++;
         total++;
         continue;
