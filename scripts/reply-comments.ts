@@ -29,7 +29,15 @@
 //   3) GET /{media}/comments                   → yorumlar + mevcut yanıtlar
 //   4) POST /{comment}/replies (message=...)   → uygun olanlara yanıt
 //
-// ENV: IG_PAGE_TOKEN (zorunlu) · IG_FB_USER_ID (isteğe bağlı,
+// YANIT ÜRETİMİ (2026-10-28): sabit havuz yerine LLM. Her yoruma, gönderi başlığı +
+//   kategorisi + yorum + KODDA hesaplanan olgular (burç, yaşam yolu sayısı) verilerek
+//   OpenAI'dan 1–2 cümlelik, uygulamaya yumuşak yönlendiren bir yanıt istenir.
+//   Model sayı hesaplamaz; yaşam yolu kodda hesaplanır (reply-helpers.ts).
+//   Üretim başarısızsa o yorum atlanır (log), koşu çökmez.
+//
+// ENV: IG_PAGE_TOKEN (zorunlu) · OPENAI_API_KEY (zorunlu; yoksa gerçek modda hata,
+//      kuru modda yalnız ne yapılacağı yazılır) · OPENAI_MODEL (varsayılan gpt-4o-mini)
+//      · REPLY_MAX_PER_RUN (varsayılan 20) · IG_FB_USER_ID (isteğe bağlı,
 //      varsayılan 17841442281703919)
 //
 // DEDUP DURUMSUZ: yorumun replies listesinde kendi username'imiz varsa atlanır.
@@ -41,6 +49,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { createHash } from "node:crypto";
+import { detectSigns, parseBirthDate, lifePath, sanitizeReply, onlyMentions, lower } from "./reply-helpers";
 
 const GRAPH_BASE = "https://graph.facebook.com/v26.0";
 const DEFAULT_IG_USER_ID = "17841442281703919"; // @pythiamystic IG business id (gizli değil)
@@ -55,8 +64,15 @@ const MEDIA_PAGE = 25; // /media sayfa boyutu
 const COMMENT_PAGES = 4; // gönderi başına en fazla kaç yorum sayfası çekilsin
 const MAX_COMMENT_AGE_DAYS = 30; // bundan eski yorumlara yanıt verilmez
 const MAX_PER_MEDIA = 6; // gönderi başına en fazla kaç yanıt
-const MAX_TOTAL = 20; // bir çalıştırmada toplam en fazla kaç yanıt
-const MIN_LEN = 12; // bundan kısa yorumlar atlanır (soru işareti varsa yine cevaplanır)
+const MAX_TOTAL_DEFAULT = 20; // bir çalıştırmada toplam en fazla kaç yanıt (REPLY_MAX_PER_RUN ile değişir)
+const CAPTION_MAX = 600; // modele giden başlık uzunluğu
+const OPENAI_TIMEOUT_MS = 25000;
+const DEFAULT_MODEL = "gpt-4o-mini";
+
+function maxTotal(): number {
+  const n = parseInt(process.env.REPLY_MAX_PER_RUN || "", 10);
+  return Number.isFinite(n) && n > 0 ? n : MAX_TOTAL_DEFAULT;
+}
 const DELAY_MS = 4000; // yanıtlar arası bekleme — hız sınırı + doğal ritim
 
 // Bu ifadeler geçen yoruma BOT DOKUNMAZ; elle cevaplanmalı.
@@ -70,45 +86,104 @@ const SKIP_PATTERNS = [
   "hata veriyor", "açılmıyor", "acilmiyor", "şikayet", "sikayet",
 ];
 
-// ─── Yanıt havuzları (gönderi kategorisine göre) ──────────────────────────
-// Aynı metni tekrar tekrar göndermek Meta'nın spam tespitine takılır: yorumlar
-// gizlenir, hesap geçici aksiyon bloğu yiyebilir. Bu yüzden her kategoride
-// birden fazla varyant var; yorum id'sine göre deterministik seçiliyor.
-const POOLS: Record<string, string[]> = {
-  compat: [
-    "Bu ikili gerçekten çok konuşuluyor 😄 Uyum tek bir puana sığmıyor aslında — aşk, iletişim ve tutku ayrı ayrı işliyor. Pythia'da iki burcu seçince üçünü de ayrı görüyorsun. Profildeki linkten ücretsiz ✨",
-    "Kendi ikilinize de bakmak isterseniz Pythia'da aşk, iletişim ve tutku puanlarınız ayrı ayrı çıkıyor 🌙 Profildeki linkten ücretsiz ✨",
-    "Uyumun tek bir cevabı yok, karşı burca göre tamamen değişiyor 🌙 Pythia'da iki burcu seçiyorsun, sonucu kart olarak da paylaşabiliyorsun. Profildeki link ✨",
-    "Çatışma her zaman uyumsuzluk değil, bazen ikisinin de aynı derecede inatçı olması demek 😄 Pythia'da ikilinizin puanına bakabilirsiniz — profildeki link ✨",
-    "Tabloda zor görünen ikililer çoğu zaman en sağlam yürüyenler oluyor 🌙 Pythia'da aşk, iletişim ve tutku puanlarınızı ayrı ayrı görebilirsiniz. Profildeki link ✨",
-  ],
-  dream: [
-    "Aynı sembol herkeste aynı şeye gelmiyor — rüyanın geri kalanı ve uyandığındaki his çok şey değiştiriyor 🌙 Rüyanı kendi cümlelerinle yazarsan Pythia sana özel yorumluyor. Profildeki linkten ücretsiz ✨",
-    "Sembolün anlamı rüyanın bütününe göre değişiyor 🌙 Rüyanı yazarsan Pythia hazır sözlükten değil, senin yazdığına özel yorumluyor. Profildeki link ✨",
-    "Bunu doğru yorumlamak için rüyanın tamamını görmek gerekiyor 🌙 Pythia'ya yazarsan sembolleri ve duygusal tonu birlikte değerlendiriyor. Profildeki linkten ücretsiz ✨",
-    "Tekrar eden rüyalar genelde tek tek bakıldığında değil, birikince anlam kazanıyor 🌙 Pythia rüya günlüğünde tekrarlayan sembolleri çıkarıyor. Profildeki link ✨",
-  ],
-  tarot: [
-    "Kartın anlamı sorduğun soruya göre değişiyor 🔮 Pythia'da günün kartını çekip kendi sorunla yorumlatabilirsin — profildeki linkten ücretsiz ✨",
-    "Tek kart mı üç kart mı çektiğin de sonucu değiştiriyor 🔮 Pythia'da geçmiş–şu an–gelecek açılımı var. Profildeki link ✨",
-    "Her sabah günün kartı otomatik geliyor 🔮 Kendi kartına bakmak istersen profildeki linkten Pythia'ya göz atabilirsin ✨",
-  ],
-  number: [
-    "Yaşam yolu sayın doğum tarihinden çıkıyor 🔢 Pythia'da kendi sayını hesaplayıp ne anlama geldiğini okuyabilirsin — profildeki link ✨",
-    "Sayılar tek başına değil, üçü birlikte anlam kazanıyor: yaşam yolu, ifade ve ruh sayısı 🔢 Pythia'da üçünü de görebilirsin. Profildeki linkten ücretsiz ✨",
-    "Kendi haritana bakmak istersen Pythia adın ve doğum tarihinle hesaplıyor 🔢 Profildeki link ✨",
-  ],
-  zodiac: [
-    "Burcunun günlük yorumunu her sabah Pythia'dan okuyabilirsin 🌙 Aşk ve kariyer için ayrı ayrı da var. Profildeki linkten ücretsiz ✨",
-    "Bu özellikler yükselen ve diğer etkilerle de değişiyor 🌙 Kendi burcunun günlük yorumu için profildeki linkten Pythia'ya bakabilirsin ✨",
-    "Burcuna özel günlük ve haftalık yorumlar Pythia'da 🌙 Profildeki linkten ücretsiz ✨",
-  ],
-  general: [
-    "Kendine özel yorumu Pythia'da bulabilirsin 🌙 Profildeki linkten ücretsiz deneyebilirsin ✨",
-    "Buna benzer içerikler ve sana özel yorumlar Pythia'da 🌙 Profildeki link ✨",
-    "Merak ettiysen Pythia'da kendine özel olanına bakabilirsin 🌙 Profildeki linkten ücretsiz ✨",
-  ],
-};
+// ─── LLM yanıt üretimi ────────────────────────────────────────────────────
+// Aynı metni tekrar tekrar göndermek Meta'nın spam tespitine takılır; LLM her yoruma
+// özgü yanıt üretir, aynı gönderide önceki yanıtlar modele verilir (açılış tekrar etmesin).
+export const SYSTEM_PROMPT = `Sen @pythiamystic Instagram hesabının yorum yanıtlayıcısısın. Pythia; yapay zekâ destekli rüya yorumu, tarot, burç yorumu ve numeroloji uygulamasıdır.
+
+SES: Sıcak, gizemli, samimi. Karşındakine "sen" diye hitap et. 1–2 cümle, en fazla ~220 karakter. En fazla 1–2 emoji (🌙 ✨ 🔮 🤍 gibi). Yorumun diliyle yanıtla (varsayılan Türkçe).
+
+İÇERİĞE CEVAP VER:
+- Yorumda burç varsa ("Koç", "Yengeç 🤍" gibi): o burca özel kısa, olumlu bir içgörü ver. "Yükselen" varsa ona da değin.
+- "YAŞAM YOLU SAYISI" verilmişse (doğum tarihi var demektir): o sayıyı AYNEN kullan ve tek cümlelik anlamını söyle. Sayıyı ASLA kendin hesaplama, verilmeyen sayı uydurma.
+- Soru varsa kısaca cevapla.
+- Emoji ya da çok kısa yorum ("Evet", "🔥") ise gönderinin konusuna bağlı sıcak, kısa bir karşılık ver.
+- Gönderi başlığı ve kategorisi bağlamdır; yorumla alakasız şeyler anlatma.
+
+HER YANITI yumuşak ve çeşitli bir uygulama yönlendirmesiyle bitir. URL YAZMA. Örnekler (aynen kopyalama, her seferinde farklı kur): "profildeki linkten Pythia'da rüyanı yorumlat 🌙", "Pythia'da kendi haritana da bakabilirsin, link profilde ✨", "günün kartı için profildeki linke göz at 🔮". Yönlendirmeyi konuya uydur (rüya, tarot, burç, sayı).
+
+YASAKLAR: Kesin kehanet ("kesin olacak" gibi) yok. Sağlık, finans, hukuk tavsiyesi yok. Dini iddia yok. Yapay zekâ ya da bot olduğundan asla söz etme. Kişisel veri isteme (doğum tarihini yorumda zaten paylaşan kişiye teşekkür/değinme serbest). Link, "www", "@" kullanma; kimseyi etiketleme.
+
+Daha önce bu gönderide verilen yanıtlar listelenirse aynı açılışı, aynı kalıbı ve aynı yönlendirme cümlesini TEKRARLAMA.
+
+ÇIKTI: Yalnızca yanıt metni. Tırnak, başlık, açıklama yok.`;
+
+export interface ReplyCtx {
+  caption: string;
+  category: string;
+  comment: string;
+  previous: string[]; // aynı gönderide bu koşuda üretilen yanıtlar
+}
+
+/** Koda ait olgular + modele giden kullanıcı mesajı. Yaşam yolu burada HESAPLANIR. */
+export function buildUserMessage(ctx: ReplyCtx): string {
+  const facts: string[] = [];
+  const si = detectSigns(ctx.comment);
+  if (si.signs.length) facts.push(`Tespit edilen burç(lar): ${si.signs.join(", ")}`);
+  if (si.rising) facts.push(`Yükselen burç: ${si.rising}`);
+  const bd = parseBirthDate(ctx.comment);
+  if (bd) {
+    const lp = lifePath(bd);
+    facts.push(`Doğum tarihi yorumda var → YAŞAM YOLU SAYISI: ${lp}${lp > 9 ? " (usta sayı)" : ""}`);
+  }
+  const parts = [
+    `Gönderi kategorisi: ${ctx.category}`,
+    `Gönderi başlığı: ${ctx.caption.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX) || "(yok)"}`,
+    `Yorum: ${ctx.comment.trim()}`,
+    `Kodla hesaplanan olgular: ${facts.length ? facts.join(" · ") : "yok"}`,
+  ];
+  if (ctx.previous.length) {
+    parts.push(`Bu gönderide daha önce verilen yanıtlar (tekrar etme):\n${ctx.previous.map((p) => `- ${p}`).join("\n")}`);
+  }
+  return parts.join("\n");
+}
+
+async function callOpenAI(userMsg: string): Promise<string> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), OPENAI_TIMEOUT_MS);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: ctl.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${(process.env.OPENAI_API_KEY || "").trim()}`,
+      },
+      body: JSON.stringify({
+        model: (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL,
+        temperature: 0.8,
+        max_tokens: 120,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMsg },
+        ],
+      }),
+    });
+    const json: any = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${json?.error?.message ?? "?"}`);
+    return String(json?.choices?.[0]?.message?.content ?? "");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Yanıt üretir; 1 yeniden deneme. Başarısızsa null (çağıran atlar). Anahtar loglanmaz. */
+async function generateReply(ctx: ReplyCtx): Promise<{ reply: string | null; err?: string }> {
+  const msg = buildUserMessage(ctx);
+  let lastErr = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callOpenAI(msg);
+      const clean = sanitizeReply(raw);
+      if (clean) return { reply: clean };
+      lastErr = "model çıktısı son kontrolden geçmedi (boş/link/@)";
+    } catch (e: any) {
+      lastErr = e?.name === "AbortError" ? "zaman aşımı" : String(e?.message ?? e);
+    }
+    if (attempt === 0) await sleep(1500);
+  }
+  return { reply: null, err: lastErr };
+}
 
 // ─── API yardımcıları ─────────────────────────────────────────────────────
 // Token ASLA loglanmaz: hata mesajlarına yalnız yol, HTTP durumu ve Meta'nın
@@ -169,11 +244,6 @@ async function igGetAll(
 }
 
 // ─── Saf yardımcılar ──────────────────────────────────────────────────────
-/** Türkçe'ye uygun küçültme (İ→i, I→ı). */
-function lower(s: string): string {
-  return s.replace(/İ/g, "i").replace(/I/g, "ı").toLowerCase();
-}
-
 /** Caption'daki etiketlerden gönderi kategorisini çıkarır (metadata.ts ile uyumlu). */
 function detectPool(caption: string): string {
   const c = lower(caption);
@@ -185,21 +255,12 @@ function detectPool(caption: string): string {
   return "general";
 }
 
-/** Yorum id'sinden deterministik varyant seçer → aynı yorum hep aynı cevabı alır. */
-function pick(pool: string[], seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return pool[h % pool.length];
-}
-
-/** Atlanmalıysa sebebi, atlanmayacaksa null döner. */
-function shouldSkip(text: string): string | null {
+/** Elle cevaplanmalıysa sebebi (MANUEL), değilse null. */
+function manualReason(text: string): string | null {
   const t = lower(text);
   for (const p of SKIP_PATTERNS) {
     if (t.includes(p)) return `hassas/şikayet ifadesi ("${p}")`;
   }
-  const letters = text.replace(/[^\p{L}\p{N}]/gu, "");
-  if (letters.length < MIN_LEN && !text.includes("?")) return "çok kısa";
   return null;
 }
 
@@ -244,6 +305,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
 async function run(dry: boolean, debug: boolean): Promise<void> {
+  const hasKey = !!(process.env.OPENAI_API_KEY || "").trim();
+  if (!hasKey && !dry) {
+    throw new Error("OPENAI_API_KEY tanımlı değil — gerçek modda yanıt üretilemez, hiçbir şey gönderilmedi.");
+  }
+  if (!hasKey) {
+    console.log("⚠️  OPENAI_API_KEY yok: kuru çalıştırma yalnızca hangi yorumlara yanıt VERİLECEĞİNİ listeler, yanıt metni üretilmez.");
+  }
+  const limit = maxTotal();
   const uid = igUserId();
   const me = await igGet(uid, { fields: "username" });
   const myName = String(me.username || "");
@@ -296,13 +365,14 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
   let probed = false;
 
   for (const m of media) {
-    if (total >= MAX_TOTAL) break;
+    if (total >= limit) break;
 
     const count = Number(m.comments_count || 0);
     if (count === 0) continue; // gerçekten yorumsuz — uca hiç gitme
 
     const poolName = detectPool(String(m.caption || ""));
-    const pool = POOLS[poolName] ?? POOLS.general;
+    const caption = String(m.caption || "");
+    const madeHere: string[] = []; // bu gönderide bu koşuda üretilen yanıtlar
 
     let comments: any[];
     try {
@@ -334,7 +404,7 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
 
     let perMedia = 0;
     for (const c of comments) {
-      if (total >= MAX_TOTAL || perMedia >= MAX_PER_MEDIA) break;
+      if (total >= limit || perMedia >= MAX_PER_MEDIA) break;
 
       const text = String(c.text || "");
       const user = String(c.username || "");
@@ -347,19 +417,37 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
       );
       if (alreadyReplied) continue;
 
-      const skip = shouldSkip(text);
-      if (skip) {
+      if (onlyMentions(text)) continue; // yalnız @etiket ("@@", "@biri") — yanıtlanacak içerik yok
+
+      const manual = manualReason(text);
+      if (manual) {
         skipped++;
-        console.log(`  ⏭️  @${user}: ${skip} → "${text.slice(0, 40)}"`);
+        console.log(`  ⏭️  MANUEL @${user}: ${manual} → "${text.slice(0, 80)}"`);
         continue;
       }
 
-      const message = pick(pool, String(c.id));
+      let message: string;
+      if (!hasKey) {
+        console.log(`  💬 @${user}: "${text.slice(0, 80)}"`);
+        console.log(`     ↳ (yanıt üretilmedi — OPENAI_API_KEY yok)`);
+        perMedia++;
+        total++;
+        continue;
+      }
+      const gen = await generateReply({ caption, category: poolName, comment: text, previous: madeHere });
+      if (!gen.reply) {
+        console.log(`  ⚠️  @${user}: yanıt üretilemedi, atlandı (${gen.err})`);
+        continue;
+      }
+      message = gen.reply;
+      madeHere.push(message);
 
       if (dry) {
-        console.log(`  💬 @${user}: "${text.slice(0, 45)}"`);
-        console.log(`     ↳ ${message.slice(0, 72)}…`);
+        console.log(`  💬 @${user}: "${text.slice(0, 80)}"`);
+        console.log(`     ↳ ${message}`);
       } else {
+        console.log(`  💬 @${user}: "${text.slice(0, 80)}"`);
+        console.log(`     ↳ ${message}`);
         try {
           await igPost(`${c.id}/replies`, { message });
           console.log(`  ✅ @${user} yanıtlandı`);

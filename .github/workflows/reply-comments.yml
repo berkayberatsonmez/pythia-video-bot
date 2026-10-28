@@ -51,6 +51,7 @@ jobs:
       - name: Yorumları yanıtla
         env:
           IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -o pipefail
           # Manuel tetiklemede varsayılan KURU; cron'da her zaman gerçek gönderim.

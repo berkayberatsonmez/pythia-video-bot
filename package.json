@@ -37,6 +37,7 @@
     "verify:sky": "tsx scripts/verify-sky.ts",
     "verify:slot-guard": "tsx scripts/verify-slot-guard.ts",
     "verify:topical": "tsx scripts/verify-topical.ts",
+    "verify:reply": "tsx scripts/verify-reply.ts",
     "verify:variety": "tsx scripts/verify-variety.ts",
     "sky:preview": "tsx scripts/sky-events.ts",
     "rotation:preview": "tsx scripts/rotation.ts --preview",
