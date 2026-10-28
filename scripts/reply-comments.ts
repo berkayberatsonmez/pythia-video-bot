@@ -65,7 +65,7 @@ const MAX_PER_MEDIA = 6; // gönderi başına en fazla kaç yanıt
 const MAX_TOTAL_DEFAULT = 20; // bir çalıştırmada toplam en fazla kaç yanıt (REPLY_MAX_PER_RUN ile değişir)
 const CAPTION_MAX = 600; // modele giden başlık uzunluğu
 const LLM_TIMEOUT_MS = 25000;
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gpt-4o";
 
 function maxTotal(): number {
   const n = parseInt(process.env.REPLY_MAX_PER_RUN || "", 10);
@@ -96,7 +96,7 @@ SES: Sıcak, gizemli, samimi. Karşındakine "sen" diye hitap et. 1–2 cümle, 
 - "YAŞAM YOLU SAYISI" verilmişse (doğum tarihi var demektir): o sayıyı AYNEN kullan ve tek cümlelik anlamını söyle. Sayıyı ASLA kendin hesaplama, verilmeyen sayı uydurma.
 - Soru varsa kısaca cevapla.
 - Emoji ya da çok kısa yorum ("Evet", "🔥") ise gönderinin konusuna bağlı sıcak, kısa bir karşılık ver.
-- Gönderi başlığı ve kategorisi bağlamdır; yorumla alakasız şeyler anlatma. Gök olaylarına (retro, dolunay) yalnızca gönderinin konusu buysa değin.
+- Gönderi başlığı ve kategorisi bağlamdır; yorumla alakasız şeyler anlatma. Gök olaylarına (retro, dolunay) yalnızca gönderinin konusu buysa değin; gönderide geçmeyen bir gök olayı UYDURMA. Tek kişiye "sen" de, ünlem ve "Harika!" gibi kalıplardan kaçın.
 
 UYGULAMAYI ZATEN KULLANAN KİŞİ: Yorumcu uygulamayı indirdiğini ya da kullandığını söylüyorsa ona "indir" ya da "profildeki linke bak" DEME. Teşekkür et ve kullanmaya devam etmeye davet et: günün kartı, rüya günlüğü ya da mağazada bir yıldız/yorum bırakmak (üçünden birini seç, her seferinde aynısını değil).
 
