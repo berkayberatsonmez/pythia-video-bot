@@ -431,7 +431,7 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
       const alreadyReplied = (c.replies?.data ?? []).some(
         (r: any) => String(r.username || "") === myName,
       );
-      if (alreadyReplied) continue;
+      if (alreadyReplied && !(process.argv.includes("--dry") && process.env.REPLY_INCLUDE_REPLIED === "1")) continue;
 
       if (onlyMentions(text)) continue; // yalnız @etiket ("@@", "@biri") — yanıtlanacak içerik yok
 
