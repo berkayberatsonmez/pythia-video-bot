@@ -3,22 +3,13 @@ name: Pythia IG Yorum Yanıtla
 # Instagram yorumlarına otomatik yanıt (scripts/reply-comments.ts).
 # Remotion/render YOK → hafif iş, Chrome bağımlılığı gerekmiyor.
 #
-# Zamanlama (UTC, TR = UTC+3): video slotlarıyla çakışmasın diye araya alındı.
-#   12:20 → öğleden sonra turu   ·   20:20 → akşam turu
-# Bu repoda cron gecikebiliyor (bkz. daily-video.yml notu); sorun değil,
-# script zaten cevaplanmış yorumları API'den görüp atlıyor.
-# ⚠️ CRON KAPALI — Meta yorum OKUMAYI advanced access'e bagladi ve o da
-# Tech Provider + business verification (sirket + vergi no) gerektiriyor.
-# Sirket olmadigi icin basvuru yapilamiyor. Bot su an yorumlari goremez;
-# bos calisip Actions dakikasi yakmasin diye zamanlama devre disi.
-# Ileride sirket kurulur ve advanced access alinirsa: asagidaki schedule
-# blogunun yorumunu kaldir, baska hicbir sey degistirmeye gerek yok.
-#
-# on:
-#   schedule:
-#     - cron: "20 12 * * *"
-#     - cron: "20 20 * * *"
+# Zamanlama: 2 saatte bir, 05:00-21:00 UTC (TR 08:00-24:00); cron "17 5-21/2 * * *".
+# GitHub cron'u yoğun saatlerde gecikebilir (dakikalar, bazen daha fazla); sorun değil,
+# script cevaplanmış yorumları API'den görüp atlıyor. Zamanlanmış koşular GERÇEK gönderir;
+# manuel tetiklemede dry varsayılan true.
 on:
+  schedule:
+    - cron: "17 5-21/2 * * *"
   workflow_dispatch:
     inputs:
       dry:
@@ -52,9 +43,12 @@ jobs:
 
       - name: Yorumları yanıtla
         env:
-          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          set -o pipefail
           # Manuel tetiklemede varsayılan KURU; cron'da her zaman gerçek gönderim.
+          {
           if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             npm run reply:comments          # cron → her zaman gerçek gönderim
           elif [ "${{ inputs.debug }}" = "true" ]; then
@@ -64,3 +58,18 @@ jobs:
           else
             npm run reply:comments
           fi
+          } 2>&1 | tee reply-out.txt
+      - name: Özet (kullanıcı adları gizli)
+        if: always()
+        run: |
+          # Repo herkese açık: kullanıcı adları maskelenir, tek bir notice'e sığdırılır
+          # (loglar API'den okunamıyor; özet check-run annotation'ından okunur).
+          [ -f reply-out.txt ] || exit 0
+          python3 - <<'PY'
+          import re
+          keep = ("👤", "📸", "💬", "↳", "⏭️", "🚨", "⚠️", "✅", "Toplam", "toplam", "HATA", "HTTP")
+          lines = [l.rstrip() for l in open("reply-out.txt", encoding="utf-8") if any(k in l for k in keep)]
+          lines = [re.sub(r"@[A-Za-z0-9_.]+", lambda m: m.group(0) if m.group(0) == "@pythiamystic" else "@***", l) for l in lines]
+          body = "%0A".join(l.replace("%", "%25").replace("\r", "") for l in lines)[:12000]
+          print(f"::notice title=Yorum botu özeti::{body or 'çıktı yok'}")
+          PY
