@@ -29,12 +29,12 @@
 //
 // YANIT ÜRETİMİ (2026-10-28): sabit havuz yerine LLM. Her yoruma, gönderi başlığı +
 //   kategorisi + yorum + KODDA hesaplanan olgular (burç, yaşam yolu sayısı) verilerek
-//   Anthropic Claude'dan (Messages API) 1–2 cümlelik, uygulamaya yumuşak yönlendiren bir yanıt istenir.
+//   OpenAI (Chat Completions, gpt-4o-mini) 1–2 cümlelik, uygulamaya yumuşak yönlendiren bir yanıt istenir.
 //   Model sayı hesaplamaz; yaşam yolu kodda hesaplanır (reply-helpers.ts).
 //   Üretim başarısızsa o yorum atlanır (log), koşu çökmez.
 //
-// ENV: IG_PAGE_TOKEN (zorunlu) · ANTHROPIC_API_KEY (zorunlu; yoksa gerçek modda hata,
-//      kuru modda yalnız ne yapılacağı yazılır) · ANTHROPIC_MODEL (varsayılan claude-sonnet-5-5)
+// ENV: IG_PAGE_TOKEN (zorunlu) · OPENAI_API_KEY (zorunlu; yoksa gerçek modda hata,
+//      kuru modda yalnız ne yapılacağı yazılır) · OPENAI_MODEL (varsayılan gpt-4o-mini)
 //      · REPLY_MAX_PER_RUN (varsayılan 20) · IG_FB_USER_ID (isteğe bağlı,
 //      varsayılan 17841442281703919)
 //
@@ -65,7 +65,7 @@ const MAX_PER_MEDIA = 6; // gönderi başına en fazla kaç yanıt
 const MAX_TOTAL_DEFAULT = 20; // bir çalıştırmada toplam en fazla kaç yanıt (REPLY_MAX_PER_RUN ile değişir)
 const CAPTION_MAX = 600; // modele giden başlık uzunluğu
 const LLM_TIMEOUT_MS = 25000;
-const DEFAULT_MODEL = "claude-sonnet-5-5";
+const DEFAULT_MODEL = "gpt-4o";
 
 function maxTotal(): number {
   const n = parseInt(process.env.REPLY_MAX_PER_RUN || "", 10);
@@ -96,7 +96,7 @@ SES: Sıcak, gizemli, samimi. Karşındakine "sen" diye hitap et. 1–2 cümle, 
 - "YAŞAM YOLU SAYISI" verilmişse (doğum tarihi var demektir): o sayıyı AYNEN kullan ve tek cümlelik anlamını söyle. Sayıyı ASLA kendin hesaplama, verilmeyen sayı uydurma.
 - Soru varsa kısaca cevapla.
 - Emoji ya da çok kısa yorum ("Evet", "🔥") ise gönderinin konusuna bağlı sıcak, kısa bir karşılık ver.
-- Gönderi başlığı ve kategorisi bağlamdır; yorumla alakasız şeyler anlatma. Gök olaylarına (retro, dolunay) yalnızca gönderinin konusu buysa değin.
+- Gönderi başlığı ve kategorisi bağlamdır; yorumla alakasız şeyler anlatma. Gök olaylarına (retro, dolunay) yalnızca gönderinin konusu buysa değin; gönderide geçmeyen bir gök olayı UYDURMA. Tek kişiye "sen" de, ünlem ve "Harika!" gibi kalıplardan kaçın.
 
 UYGULAMAYI ZATEN KULLANAN KİŞİ: Yorumcu uygulamayı indirdiğini ya da kullandığını söylüyorsa ona "indir" ya da "profildeki linke bak" DEME. Teşekkür et ve kullanmaya devam etmeye davet et: günün kartı, rüya günlüğü ya da mağazada bir yıldız/yorum bırakmak (üçünden birini seç, her seferinde aynısını değil).
 
@@ -154,30 +154,30 @@ export function buildUserMessage(ctx: ReplyCtx): string {
   return parts.join("\n");
 }
 
-async function callClaude(userMsg: string): Promise<string> {
+async function callOpenAI(userMsg: string): Promise<string> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS);
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       signal: ctl.signal,
       headers: {
-        "x-api-key": (process.env.ANTHROPIC_API_KEY || "").trim(),
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${(process.env.OPENAI_API_KEY || "").trim()}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: (process.env.ANTHROPIC_MODEL || "").trim() || DEFAULT_MODEL,
-        max_tokens: 200,
+        model: (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL,
         temperature: 0.8,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userMsg }],
+        max_tokens: 200,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMsg },
+        ],
       }),
     });
     const json: any = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`Anthropic HTTP ${res.status}: ${json?.error?.message ?? "?"}`);
-    const blocks: any[] = Array.isArray(json?.content) ? json.content : [];
-    return blocks.filter((b) => b?.type === "text").map((b) => String(b.text ?? "")).join("");
+    if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${json?.error?.message ?? "?"}`);
+    return String(json?.choices?.[0]?.message?.content ?? "");
   } finally {
     clearTimeout(timer);
   }
@@ -189,7 +189,7 @@ async function generateReply(ctx: ReplyCtx): Promise<{ reply: string | null; err
   let lastErr = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await callClaude(msg);
+      const raw = await callOpenAI(msg);
       const clean = sanitizeReply(raw);
       if (clean) return { reply: clean };
       lastErr = "model çıktısı son kontrolden geçmedi (boş/link/@)";
@@ -321,12 +321,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Ana akış ─────────────────────────────────────────────────────────────
 async function run(dry: boolean, debug: boolean): Promise<void> {
-  const hasKey = !!(process.env.ANTHROPIC_API_KEY || "").trim();
+  const hasKey = !!(process.env.OPENAI_API_KEY || "").trim();
   if (!hasKey && !dry) {
-    throw new Error("ANTHROPIC_API_KEY tanımlı değil — gerçek modda yanıt üretilemez, hiçbir şey gönderilmedi.");
+    throw new Error("OPENAI_API_KEY tanımlı değil — gerçek modda yanıt üretilemez, hiçbir şey gönderilmedi.");
   }
   if (!hasKey) {
-    console.log("⚠️  ANTHROPIC_API_KEY yok: kuru çalıştırma yalnızca hangi yorumlara yanıt VERİLECEĞİNİ listeler, yanıt metni üretilmez.");
+    console.log("⚠️  OPENAI_API_KEY yok: kuru çalıştırma yalnızca hangi yorumlara yanıt VERİLECEĞİNİ listeler, yanıt metni üretilmez.");
   }
   const limit = maxTotal();
   const uid = igUserId();
@@ -445,7 +445,7 @@ async function run(dry: boolean, debug: boolean): Promise<void> {
       let message: string;
       if (!hasKey) {
         console.log(`  💬 @${user}: "${text.slice(0, 80)}"`);
-        console.log(`     ↳ (yanıt üretilmedi — ANTHROPIC_API_KEY yok)`);
+        console.log(`     ↳ (yanıt üretilmedi — OPENAI_API_KEY yok)`);
         perMedia++;
         total++;
         continue;
