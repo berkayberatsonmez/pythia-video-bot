@@ -52,7 +52,9 @@ jobs:
         env:
           IG_PAGE_TOKEN: ${{ secrets.IG_PAGE_TOKEN }}
         run: |
+          set -o pipefail
           # Manuel tetiklemede varsayılan KURU; cron'da her zaman gerçek gönderim.
+          {
           if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             npm run reply:comments          # cron → her zaman gerçek gönderim
           elif [ "${{ inputs.debug }}" = "true" ]; then
@@ -62,3 +64,18 @@ jobs:
           else
             npm run reply:comments
           fi
+          } 2>&1 | tee reply-out.txt
+      - name: Özet (kullanıcı adları gizli)
+        if: always()
+        run: |
+          # Repo herkese açık: kullanıcı adları maskelenir, tek bir notice'e sığdırılır
+          # (loglar API'den okunamıyor; özet check-run annotation'ından okunur).
+          [ -f reply-out.txt ] || exit 0
+          python3 - <<'PY'
+          import re
+          keep = ("👤", "📸", "💬", "↳", "⏭️", "🚨", "⚠️", "✅", "Toplam", "toplam", "HATA", "HTTP")
+          lines = [l.rstrip() for l in open("reply-out.txt", encoding="utf-8") if any(k in l for k in keep)]
+          lines = [re.sub(r"@[A-Za-z0-9_.]+", lambda m: m.group(0) if m.group(0) == "@pythiamystic" else "@***", l) for l in lines]
+          body = "%0A".join(l.replace("%", "%25").replace("\r", "") for l in lines)[:12000]
+          print(f"::notice title=Yorum botu özeti::{body or 'çıktı yok'}")
+          PY
