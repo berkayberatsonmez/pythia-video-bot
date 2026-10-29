@@ -35,6 +35,7 @@
     "video": "tsx scripts/render-one.ts",
     "verify:rotation": "tsx scripts/verify-rotation.ts",
     "verify:sky": "tsx scripts/verify-sky.ts",
+    "verify:tiktok": "tsx scripts/verify-tiktok.ts",
     "verify:slot-guard": "tsx scripts/verify-slot-guard.ts",
     "verify:topical": "tsx scripts/verify-topical.ts",
     "verify:reply": "tsx scripts/verify-reply.ts",

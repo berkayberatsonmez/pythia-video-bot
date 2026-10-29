@@ -66,34 +66,19 @@ jobs:
           fi
           exit 0
 
-      - name: Bugünün klibini seç (rotasyon — deterministik, gün bazlı)
+      # TikTok = o günün IG SABAH slotuyla AYNI video (scripts/tiktok-rotation.ts):
+      # seçim rotation.ts getVideosForDay(İstanbul günü)[0], tema/ses/seslendirme
+      # render-rotation.ts ile aynı. SALT RENDER: IG/YT'ye yüklemez, slot-guard ve
+      # yayın günlüğüne dokunmaz (IG sabah slotu etkilenmez). Çıktı: out/tiktok/.
+      - name: Bugünün IG sabah videosunu seç (aynı fonksiyon, aynı gün)
         id: pick
-        run: |
-          PICK=$(npx tsx scripts/tiktok-pick-today.ts)
-          echo "picked: $PICK"
-          echo "comp=$(echo "$PICK" | jq -r .comp)"         >> "$GITHUB_OUTPUT"
-          echo "propKey=$(echo "$PICK" | jq -r .propKey)"   >> "$GITHUB_OUTPUT"
-          echo "category=$(echo "$PICK" | jq -r .category)" >> "$GITHUB_OUTPUT"
-          echo "id=$(echo "$PICK" | jq -r .id)"             >> "$GITHUB_OUTPUT"
-          echo "date=$(date -u +%Y%m%d)"                    >> "$GITHUB_OUTPUT"
+        run: npx tsx scripts/tiktok-rotation.ts --dry --github-output
 
-      - name: Kompozisyonu render et (MEVCUT hat — voiceover'sız)
-        run: |
-          mkdir -p out/tiktok
-          echo "{ \"${{ steps.pick.outputs.propKey }}\": \"${{ steps.pick.outputs.id }}\", \"tiktokClean\": true }" > props.json
-          npx remotion render src/index.ts "${{ steps.pick.outputs.comp }}" out/tiktok/_raw.mp4 --props=props.json
-
-      - name: Native caption + panel asset'lerine paketle
+      - name: Render et + caption paketle (IG sabah ile aynı içerik)
         id: pack
         run: |
-          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out/tiktok/_raw.mp4 2>/dev/null | cut -d. -f1)
-          npx tsx scripts/render-tiktok-demo.ts \
-            --in out/tiktok/_raw.mp4 \
-            --category "${{ steps.pick.outputs.category }}" \
-            --id "${{ steps.pick.outputs.id }}" \
-            --duration "${DUR:-0}"
-          rm -f out/tiktok/_raw.mp4
-          echo "tag=pythia-auto-${{ steps.pick.outputs.date }}"                 >> "$GITHUB_OUTPUT"
+          npx tsx scripts/tiktok-rotation.ts
+          echo "tag=pythia-auto-${{ steps.pick.outputs.date }}"                          >> "$GITHUB_OUTPUT"
           echo "format=${{ steps.pick.outputs.category }}-${{ steps.pick.outputs.id }}" >> "$GITHUB_OUTPUT"
 
       - name: GitHub Release'e yayınla (Worker /publish bunu okur)
