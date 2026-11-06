@@ -1,10 +1,11 @@
-// verify-rotation.ts — rotasyon dizisi değişmezleri (ağ yok, saat yok).
+// verify-rotation.ts — ESKİ rotasyon dizisi değişmezleri (PLANNER_START öncesi günler; ağ yok, saat yok).
+// Yeni planlayıcı: verify-planner.ts.
 //   1) Bir tam döngüde her (category:id) TAM BİR kez geçer.
 //   2) Her gün için sabah ve akşam FARKLI poolKey (tüm döngü boyunca).
 //   3) Dizi dairesel olarak komşu-farklı (son→ilk dahil).
 //   4) Deterministik: iki kez kurulan dizi aynı.
 // Çalıştır: npm run verify:rotation
-import { buildSequence, getVideosForDay, POOLS } from "./rotation";
+import { buildSequence, legacyVideosForDay, POOLS } from "./rotation";
 
 let fail = 0;
 const check = (ok: boolean, msg: string) => {
@@ -32,7 +33,7 @@ check(adj === 0, `komşu (dairesel) aynı pool sayısı = ${adj}`);
 // Tam döngü: len gün her (2d, 2d+1) çiftini (len tekse tüm komşuluklar) gezer.
 let same = 0;
 for (let d = 0; d < seq.length * 2; d++) {
-  const [m, e] = getVideosForDay(d, seq);
+  const [m, e] = legacyVideosForDay(d, seq);
   if (m.poolKey === e.poolKey) same++;
 }
 check(same === 0, `sabah/akşam aynı kategori olan gün = ${same} (${seq.length * 2} gün)`);
