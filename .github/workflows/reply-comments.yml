@@ -67,9 +67,14 @@ jobs:
           [ -f reply-out.txt ] || exit 0
           python3 - <<'PY'
           import re
-          keep = ("👤", "📸", "💬", "↳", "⏭️", "🚨", "⚠️", "✅", "Toplam", "toplam", "HATA", "HTTP")
+          keep = ("🎯", "👤", "📸", "💬", "↳", "⏭️", "🚨", "⚠️", "✅", "❌", "Toplam", "toplam", "HATA", "HTTP")
           lines = [l.rstrip() for l in open("reply-out.txt", encoding="utf-8") if any(k in l for k in keep)]
           lines = [re.sub(r"@[A-Za-z0-9_.]+", lambda m: m.group(0) if m.group(0) == "@pythiamystic" else "@***", l) for l in lines]
+          # Yorum METNİ de kişisel veri: herkese açık annotation'a yazılmaz, yalnız uzunluğu.
+          lines = [re.sub(r'(💬 @\*\*\*: )"(.*)"$', lambda m: f"{m.group(1)}[yorum {len(m.group(2))} kr]", l) for l in lines]
+          # Sayaç satırı (🎯 gönderilen/elle bırakılan) EN ÜSTE: 12000 karakter kesiminde kaybolmasın,
+          # haftalık rapor gönderilen yanıt sayısını buradan okur.
+          lines = [l.strip() for l in lines if "🎯" in l] + [l for l in lines if "🎯" not in l]
           body = "%0A".join(l.replace("%", "%25").replace("\r", "") for l in lines)[:12000]
           print(f"::notice title=Yorum botu özeti::{body or 'çıktı yok'}")
           PY
