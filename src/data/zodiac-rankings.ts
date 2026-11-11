@@ -6,6 +6,8 @@
 // (1. en sona saklanır = max merak). signId → zodiac-signs.ts glyph/isim.
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { SEASON_RANKINGS } from "./zodiac-season-rankings";
+
 export type RankItem = { signId: string; blurb: string };
 
 export type Ranking = {
@@ -140,5 +142,6 @@ export const ZODIAC_RANKINGS: Ranking[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 export function getRankingById(id: string): Ranking | undefined {
-  return ZODIAC_RANKINGS.find((r) => r.id === id);
+  // Sezon sıralamaları (gündem içeriği) normal havuzda değil ama aynı biçimde render edilir.
+  return ZODIAC_RANKINGS.find((r) => r.id === id) ?? SEASON_RANKINGS.find((r) => r.id === id);
 }

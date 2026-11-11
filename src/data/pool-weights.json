@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "note": "scripts/pool-weights.ts üretir (haftalık: .github/workflows/pool-weights.yml). Kayıtlar SİLİNMEZ/DEĞİŞTİRİLMEZ: rotasyon geçmiş günleri o gün yürürlükteki kayıtla yeniden kurar. Elle ayar: yeni kayıt ekle, from = gelecekteki bir gün. Ağırlık 2 = eski rotasyondaki sıklık, 4 = iki katı, 1 = yarısı.",
+  "entries": [
+    {
+      "from": "2026-11-11",
+      "computedAt": "2026-11-06",
+      "method": "ig snapshot, son 28 gün, ≥3 günlük; değer=ln(1+izlenme+10×(paylaşım+kaydetme)); shrinkage K=6; ağırlık=2×exp(skor−genel) ∈ [1,4], 0,25 adım",
+      "window": {
+        "from": "2026-10-09",
+        "to": "2026-11-06"
+      },
+      "samples": {
+        "angel": 6,
+        "behavior": 4,
+        "compat": 10,
+        "dream": 4,
+        "manifest": 5,
+        "numerology": 6,
+        "ranking": 4,
+        "sky": 4,
+        "tarot": 4,
+        "zodiac": 2
+      },
+      "geoMean": {
+        "angel": 174,
+        "behavior": 215,
+        "compat": 705,
+        "dream": 126,
+        "manifest": 142,
+        "numerology": 174,
+        "ranking": 182,
+        "sky": 537,
+        "tarot": 187,
+        "zodiac": 328
+      },
+      "weights": {
+        "dream": 1.5,
+        "tarot": 1.75,
+        "zodiac": 2.25,
+        "ranking": 1.75,
+        "behavior": 2,
+        "compat": 4,
+        "numerology": 1.75,
+        "angel": 1.75,
+        "manifest": 1.5
+      }
+    }
+  ]
+}
