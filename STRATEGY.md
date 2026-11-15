@@ -104,3 +104,44 @@ Haftalık:
 ✅ Platform: YouTube Shorts birincil (en iyi organik)
 ✅ Havuz: ~80-110 video = 1.5-2 ay tekrarsız
 ```
+
+---
+
+## 🧠 PERFORMANS AĞIRLIĞI + GÜNDEM (2026-11-11'den itibaren)
+
+Rotasyon artık sabit bir dizi değil, günleri sırayla kuran **deterministik bir
+planlayıcı** (`scripts/rotation.ts`). Eski dizi 2026-11-10'a kadar aynen geçerli.
+
+**Ağırlık (haftalık, veriden):** `.github/workflows/pool-weights.yml` her
+pazartesi son 28 günün Instagram metriklerinden kategori ağırlığını hesaplar
+(`scripts/pool-weights.ts`) ve `src/data/pool-weights.json`'a yeni bir kayıt
+önerir (`raporlar` dalı / PR). **Birleştirmeden hiçbir şey değişmez.**
+
+| ağırlık | anlamı |
+|---|---|
+| 2 | eski rotasyondaki sıklık (nötr) |
+| 4 | iki katı (en fazla) |
+| 1 | yarısı (en az — hiçbir kategori kapanmaz) |
+
+Pay = ağırlık × kategori boyu, tek kategori en çok %40. Skor: izlenme +
+10×(paylaşım+kaydetme), logaritmik ortalama, az videolu kategori genel
+ortalamaya çekilir. Öneri `from` gününden ÖNCE birleştirilmeli.
+
+**Tekrar yok:** aynı video 21 gün içinde iki kez çıkmaz; sabah ≠ akşam ve
+akşam ≠ ertesi sabah kategorisi; ağırlık değişince geçmiş günler değişmez.
+
+**Gündem (`scripts/gundem.ts`, günde en çok 1 slot, önce sabah = TikTok):**
+11.11 / 12.12 portal → melek sayısı · Sevgililer Günü → uyum / aşk ·
+yılbaşı haftası → yeni başlangıç manifestoları · Dolunay → bırakma, Yeniay →
+niyet manifestoları · Güneş burç değiştirince ilk 10 gün → "X sezonunda
+parlayan 3 burç" (`src/data/zodiac-season-rankings.ts`) + o burcun videoları ·
+Merkür/Venüs/Mars retrosu → iletişim / eski sevgili içerikleri. Dini gün yok.
+Google Trends seçimi değiştirmez (yalnız etiket): IG ve TikTok farklı saatte
+indiriyor, seçim ikisinde aynı kalmalı.
+
+```bash
+npm run plan:preview -- --days 30      # eski vs yeni, kategori dağılımı
+npm run gundem:preview -- --days 60    # hangi gün hangi gündem
+npm run weights:report                 # (analytics:pull sonrası) ağırlık tablosu
+npm run verify:planner && npm run verify:weights
+```

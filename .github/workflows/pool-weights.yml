@@ -1,0 +1,80 @@
+name: Pythia Haftalık Kategori Ağırlığı Önerisi
+
+# Haftada bir: yayın arşivinden (video-observability) son 28 günün Instagram
+# metriklerini okur, kategori ağırlıklarını hesaplar (scripts/pool-weights.ts) ve
+# değiştiyse src/data/pool-weights.json'a YENİ bir kayıt ekleyip `raporlar` dalına
+# yazar. main'e DOĞRUDAN yazmaz: BBS görüp birleştirir.
+#
+# Neden PR değil de dal (+ mümkünse PR): GITHUB_TOKEN'la PR açmak depo ayarına
+# bağlı ("Allow GitHub Actions to create and approve pull requests", varsayılan
+# KAPALI). Dal her durumda yazılır; PR açılabiliyorsa açılır, açılamıyorsa özet
+# sayfasında tek tıklık karşılaştırma bağlantısı verilir. Rotasyon her zaman
+# main'deki dosyayı okur → birleştirilmeyen öneri hiçbir yayını etkilemez.
+#
+# Yayın yapmaz, video render etmez, sır okumaz (yalnız GITHUB_TOKEN: arşiv okuma + dal).
+on:
+  schedule:
+    - cron: "23 5 * * 1" # Pazartesi TR 08:23
+  workflow_dispatch:
+
+permissions:
+  contents: write # raporlar dalını yazmak + release arşivini okumak
+  pull-requests: write # depo ayarı izin veriyorsa PR açmak
+
+concurrency:
+  group: pool-weights
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Ağırlık hesabı testleri
+        run: npm run verify:weights
+      - name: Yayın arşivini indir
+        run: npm run analytics:pull
+      - name: Ağırlıkları hesapla ve öner
+        env:
+          POOL_WEIGHTS_SUMMARY: out/pool-weights-summary.md
+        run: npm run weights:propose
+      - name: Planlayıcı yeni ağırlıklarla da geçiyor mu
+        run: npm run verify:planner
+      - name: raporlar dalına yaz (+ mümkünse PR)
+        run: |
+          if git diff --quiet -- src/data/pool-weights.json; then
+            echo "Ağırlıklar değişmedi — öneri yok."
+            exit 0
+          fi
+          FROM=$(node -e "const f=require('./src/data/pool-weights.json');console.log(f.entries[f.entries.length-1].from)")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B raporlar
+          git add src/data/pool-weights.json
+          git commit -m "chore(weights): kategori ağırlığı önerisi (from=$FROM)"
+          git push --force origin raporlar
+          {
+            echo "Haftalık kategori ağırlığı önerisi. **$FROM gününden ÖNCE birleştir** — geç kalınırsa kapat, gelecek haftaki öneri yenisini getirir (geçmiş günlerin planı o gün yürürlükteki ağırlıkla kurulur)."
+            echo
+            cat out/pool-weights-summary.md
+          } > out/pr-body.md
+          if gh pr list --head raporlar --base main --state open --json number --jq '.[0].number' | grep -q .; then
+            gh pr edit raporlar --body-file out/pr-body.md || true
+            echo "Açık PR güncellendi."
+          elif gh pr create --base main --head raporlar --title "Kategori ağırlıkları (from=$FROM)" --body-file out/pr-body.md; then
+            echo "PR açıldı."
+          else
+            URL="https://github.com/${GITHUB_REPOSITORY}/compare/main...raporlar?expand=1"
+            echo "::notice title=Ağırlık önerisi::PR açılamadı (depo ayarı). Karşılaştır ve birleştir: $URL"
+            echo "PR açılamadı → [raporlar dalını karşılaştır]($URL)" >> "$GITHUB_STEP_SUMMARY"
+          fi
