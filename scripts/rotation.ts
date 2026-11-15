@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // rotation.ts — Stateless çok-kategorili rotasyon (CI uyumlu)
 //
-// İKİ DÖNEM: PLANNER_START (2026-11-11) öncesi günler aşağıdaki ESKİ dizidir
+// İKİ DÖNEM: PLANNER_START (2026-11-20) öncesi günler aşağıdaki ESKİ dizidir
 // (legacyVideosForDay; geçmiş yayınlar aynen). O günden itibaren getVideosForDay
 // PLANLAYICIYI kullanır: performans ağırlığı (src/data/pool-weights.json) +
 // gündem (scripts/gundem.ts) + 21 günlük tekrar yasağı. Ayrıntı dosyanın sonunda.
@@ -371,7 +371,7 @@ export function legacyVideosForDay(
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Planlayıcının ilk günü. Bu günden ÖNCE main'e alınmalı (yoksa ileri al). */
-export const PLANNER_START_DATE = "2026-11-11";
+export const PLANNER_START_DATE = "2026-11-20";
 export const PLANNER_START = dateToDay(PLANNER_START_DATE);
 /** Aynı öğe bu kadar gün içinde iki kez yayınlanmaz. */
 export const NO_REPEAT_DAYS = 21;

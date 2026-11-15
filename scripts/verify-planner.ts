@@ -155,7 +155,7 @@ invariants("uç: hepsi 4", run([{ from: PLANNER_START, weights: W(() => 4) }], 2
 // ─── 5) Gündem ───────────────────────────────────────────────────────────
 {
   const at = (date: string) => base.days[dateToDay(date) - PLANNER_START];
-  check(at("2026-11-11")[0].id === "a1111", `11.11 sabah = melek sayısı 1111 (${key(at("2026-11-11")[0])})`);
+  check(at("2027-11-11")[0].id === "a1111", `11.11 sabah = melek sayısı 1111 (${key(at("2027-11-11")[0])})`);
   check(at("2026-12-12").some((v) => v.id === "a1212"), `12.12 = 1212 (${at("2026-12-12").map(key).join(", ")})`);
   // Her sezon girişinden sonraki ilk 10 günde o sezonun sıralaması yayınlanır.
   let seasonMiss = 0;
