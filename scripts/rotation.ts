@@ -381,7 +381,21 @@ const SEED_DAYS = 120;
 /** Gündem öğesini kaç gün önceden normal rotasyondan sakla. */
 const RESERVE_DAYS = 14;
 
-export type WeightSchedule = { from: number; weights: Record<PoolKey, number> }[];
+/**
+ * Slot eğilimi: yalnız SEÇİM sırasına eklenir, `take()` kredi düşümüne girmez →
+ * uzun vadeli pool payı (ağırlık) DEĞİŞMEZ, yalnız hangi slotta çıktığı kayar.
+ * Ölçüm (IG, son 90 gün, her videonun son snapshot'ı): uyum akşam ortanca 466
+ * (n=6) / sabah 195 (n=12); davranış akşam 196 (n=3) / sabah 163 (n=3), en iyi
+ * davranış videoları akşam (2.787, 3.068). Akşam 20:30 = ilişki içeriğinin
+ * izleyicisinin aktif olduğu saat. Sosyal rapor 2026-11-16.
+ */
+export const SLOT_BIAS: Partial<Record<PoolKey, number>> = { compat: 0.15, behavior: 0.1 };
+export function slotBias(pool: PoolKey, slot: "morning" | "evening"): number {
+  const b = SLOT_BIAS[pool] ?? 0;
+  return slot === "evening" ? b : -b;
+}
+
+export type WeightSchedule ={ from: number; weights: Record<PoolKey, number> }[];
 
 /** Dosya yoksa: eski sabitler (POOL_WEIGHTS) — çarpan olarak, 2 = eski sıklık. */
 export function loadWeightSchedule(file?: string): WeightSchedule {
@@ -545,7 +559,7 @@ export function createPlanner(schedule: WeightSchedule = loadWeightSchedule(), s
       let bestC = -Infinity;
       for (const k of POOL_ORDER) {
         if (k === prevPool) continue;
-        const c = credits[k] + shares[k];
+        const c = credits[k] + shares[k] + slotBias(k, slot);
         if (c <= bestC) continue;
         const id = lru(k, slotNo);
         if (!id) continue;

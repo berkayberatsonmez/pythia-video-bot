@@ -150,6 +150,12 @@ invariants("uç: hepsi 4", run([{ from: PLANNER_START, weights: W(() => 4) }], 2
   check(Math.abs(worst.got - worst.want) <= 0.04,
     `paylar hedefe yakın (en büyük sapma ${worst.k}: %${(worst.got * 100).toFixed(1)} / hedef %${(worst.want * 100).toFixed(1)})`);
   console.log("   " + devs.map((d) => `${d.k} %${(d.got * 100).toFixed(0)}/${(d.want * 100).toFixed(0)}`).join(" · "));
+  // Slot eğilimi (SLOT_BIAS): uyum çoğunlukla akşam, ama sabahta da kalır (kıyas
+  // ölçülebilsin, TikTok = IG sabah uyumsuz kalmasın); pay yukarıda değişmedi.
+  const cs: Record<string, number> = { morning: 0, evening: 0 };
+  for (const vs of base.days) for (const v of vs) if (v.poolKey === "compat") cs[v.slot]++;
+  const ev = cs.evening / (cs.morning + cs.evening);
+  check(ev >= 0.65 && ev <= 0.9, `slot eğilimi: uyum akşam %${Math.round(ev * 100)} (sabah ${cs.morning}, akşam ${cs.evening}; hedef %65–90)`);
 }
 
 // ─── 5) Gündem ───────────────────────────────────────────────────────────
