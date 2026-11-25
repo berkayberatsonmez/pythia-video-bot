@@ -115,7 +115,7 @@ planlayıcı** (`scripts/rotation.ts`). Eski dizi 2026-11-10'a kadar aynen geçe
 **Ağırlık (haftalık, veriden):** `.github/workflows/pool-weights.yml` her
 pazartesi son 28 günün Instagram metriklerinden kategori ağırlığını hesaplar
 (`scripts/pool-weights.ts`) ve `src/data/pool-weights.json`'a yeni bir kayıt
-önerir (`raporlar` dalı / PR). **Birleştirmeden hiçbir şey değişmez.**
+önerir (`oneri/kategori-agirligi` dalı / PR). **Birleştirmeden hiçbir şey değişmez.**
 
 | ağırlık | anlamı |
 |---|---|
