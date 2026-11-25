@@ -45,6 +45,50 @@
         "angel": 1.75,
         "manifest": 1.5
       }
+    },
+    {
+      "from": "2026-11-26",
+      "computedAt": "2026-11-23",
+      "method": "ig snapshot, son 28 gün, ≥3 günlük; değer=ln(1+izlenme+10×(paylaşım+kaydetme)); shrinkage K=6; ağırlık=2×exp(skor−genel) ∈ [1,4], 0,25 adım",
+      "window": {
+        "from": "2026-10-26",
+        "to": "2026-11-23"
+      },
+      "samples": {
+        "angel": 3,
+        "behavior": 3,
+        "compat": 15,
+        "dream": 4,
+        "manifest": 4,
+        "numerology": 3,
+        "ranking": 3,
+        "sky": 5,
+        "tarot": 5,
+        "zodiac": 3
+      },
+      "geoMean": {
+        "angel": 184,
+        "behavior": 755,
+        "compat": 425,
+        "dream": 222,
+        "manifest": 191,
+        "numerology": 196,
+        "ranking": 290,
+        "sky": 284,
+        "tarot": 203,
+        "zodiac": 483
+      },
+      "weights": {
+        "dream": 1.75,
+        "tarot": 1.75,
+        "zodiac": 2.25,
+        "ranking": 2,
+        "behavior": 2.75,
+        "compat": 2.5,
+        "numerology": 1.75,
+        "angel": 1.75,
+        "manifest": 1.75
+      }
     }
   ]
 }
